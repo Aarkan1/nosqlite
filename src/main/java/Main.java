@@ -1,3 +1,4 @@
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import database.Database;
 import entities.Cat;
@@ -24,6 +25,7 @@ public class Main {
     User[] importedUsers = null;
     try {
       ObjectMapper mapper = new ObjectMapper();
+      mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
       importedUsers = mapper.readValue(new File(Paths.get("src/main/java/users.json").toString()), User[].class);
     } catch (IOException e) {
       e.printStackTrace();
@@ -49,7 +51,7 @@ public class Main {
 //    System.out.println("saved 100'000 users: " + ((System.currentTimeMillis() - start)) + "ms");
 
     start = System.currentTimeMillis();
-    System.out.println(collection("User").find("cat.race.type=Gekko gecko").size());
+    System.out.println(collection("User").find("cat.race.time >= 50 && (cat.race.type =~ ma || cat.race.type = Houma)", 20).size());
     System.out.println("find users deep: " + ((System.currentTimeMillis() - start)) + "ms");
 
     start = System.currentTimeMillis();
@@ -66,6 +68,8 @@ public class Main {
         find all users: 766ms
      */
     System.out.println("find all users: " + ((System.currentTimeMillis() - start)) + "ms");
+
+    System.out.println(collection("User").findById("yvhXGcmLXJCztIHAPgdb-"));
   }
 
   private static void saveUsers(User[] users, int iter) {

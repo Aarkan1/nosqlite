@@ -29,8 +29,9 @@ public class Race {
 
   @Override
   public String toString() {
-    return "\nRace{" +
+    return "Race{" +
             "type='" + type + '\'' +
+            ", time=" + time +
             '}';
   }
 }
