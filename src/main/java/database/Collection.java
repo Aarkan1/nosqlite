@@ -4,9 +4,11 @@ import com.aventrix.jnanoid.jnanoid.NanoIdUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import entities.User;
 import utilities.Rewriter;
 import utilities.Utils;
 
+import java.lang.annotation.AnnotationTypeMismatchException;
 import java.lang.reflect.Field;
 import java.sql.*;
 import java.util.*;
@@ -46,31 +48,49 @@ public class Collection<T> {
     }
   }
 
-  public T save(Object model) {
-    Map<String, String> field = getIdField(model);
+  public T save(Object document) {
     try {
-      String json = mapper.writeValueAsString(model);
+      if(document.getClass() != klass) {
+        throw new TypeMismatchException(String.format("'%s' cannot be saved in a '%s' collection", document.getClass().getSimpleName(), klassName));
+      }
+    } catch (TypeMismatchException e) {
+      e.printStackTrace();
+      return null;
+    }
+
+    Map<String, String> field = getIdField(document);
+    try {
+      String json = mapper.writeValueAsString(document);
       String q = String.format("insert into %s values(?, json(?)) " +
               "on conflict(key) do update set value=json(excluded.value)", klassName);
       PreparedStatement stmt = conn.prepareStatement(q);
       stmt.setString(1, field.get("id"));
       stmt.setString(2, json);
       stmt.executeUpdate();
-      updateWatchers(new WatchData(klassName, "save", Collections.singletonList(model)));
+      updateWatchers(new WatchData(klassName, "save", Collections.singletonList(document)));
     } catch (SQLException | JsonProcessingException e) {
       e.printStackTrace();
     }
-    return (T) model;
+    return (T) document;
   }
 
-  public T save(Object[] models) {
+  public T save(Object[] documents) {
+    try {
+      if(documents[0].getClass() != klass) {
+        throw new TypeMismatchException(String.format("'%s' cannot be saved in a '%s' collection", documents[0].getClass().getSimpleName(), klassName));
+      }
+    } catch (TypeMismatchException e) {
+      e.printStackTrace();
+      return null;
+    }
+
     try {
       conn.setAutoCommit(false);
       String q = "insert into "+klassName+" values(?, json(?)) " +
               "on conflict(key) do update set value=json(excluded.value)";
       PreparedStatement stmt = conn.prepareStatement(q);
 
-      for(Object model : models) {
+      for(Object model : documents) {
         Map<String, String> field = getIdField(model);
         String json = mapper.writeValueAsString(model);
 
@@ -82,7 +102,7 @@ public class Collection<T> {
       conn.commit();
       stmt.close();
 
-      updateWatchers(new WatchData(klassName, "save", Arrays.asList(models)));
+      updateWatchers(new WatchData(klassName, "save", Arrays.asList(documents)));
     } catch (SQLException | JsonProcessingException e) {
       e.printStackTrace();
     } finally {
@@ -92,7 +112,7 @@ public class Collection<T> {
         e.printStackTrace();
       }
     }
-    return (T) models;
+    return (T) documents;
   }
 
   public List<T> find() {
@@ -105,12 +125,9 @@ public class Collection<T> {
 
   public List<T> find(int limit, int offset) {
     try {
-      var rs = conn.createStatement().executeQuery(
-              String.format("select group_concat(value) from (select value from %1$s" + (limit == 0 ? "" : " limit %2$d offset %3$d)"),
-                      klassName, limit, offset));
-      String jsonArray = "[" + rs.getString(1) + "]";
+      String jsonArray = findAsJson(null, limit, offset);
       return mapper.readValue(jsonArray, mapper.getTypeFactory().constructCollectionType(List.class, klass));
-    } catch (SQLException | JsonProcessingException e) {
+    } catch (JsonProcessingException e) {
       e.printStackTrace();
     }
     return new ArrayList<>();
@@ -125,19 +142,55 @@ public class Collection<T> {
   }
 
   public List<T> find(String filter, int limit, int offset) {
-    Map<String, List<String>> filters = generateWhereClause(filter);
     try {
+      String jsonArray = findAsJson(filter, limit, offset);
+      return mapper.readValue(jsonArray, mapper.getTypeFactory().constructCollectionType(List.class, klass));
+    } catch (JsonProcessingException e) {
+      e.printStackTrace();
+    }
+    return new ArrayList<>();
+  }
+
+  public String findAsJson() {
+    return findAsJson(null, 0, 0);
+  }
+
+  public String findAsJson(int limit) {
+    return findAsJson(null, limit, 0);
+  }
+
+  public String findAsJson(int limit, int offset) {
+    return findAsJson(null, limit, offset);
+  }
+
+  public String findAsJson(String filter) {
+    return findAsJson(filter, 0, 0);
+  }
+
+  public String findAsJson(String filter, int limit) {
+    return findAsJson(filter, limit, 0);
+  }
+
+  public String findAsJson(String filter, int limit, int offset) {
+    try {
+      if(filter == null) {
+        ResultSet rs = conn.createStatement().executeQuery(
+                String.format("select group_concat(value) from (select value from %1$s" + (limit == 0 ? ")" : " limit %2$d offset %3$d)"),
+                        klassName, limit, offset));
+        return "[" + rs.getString(1) + "]";
+      }
+
+      Map<String, List<String>> filters = generateWhereClause(filter);
       String q = String.format("select group_concat(value) from (select value from %1$s"
               + filters.get("query").get(0) + (limit == 0 ? ")" : " limit %2$d offset %3$d)"), klassName, limit, offset);
       PreparedStatement stmt = conn.prepareStatement(q);
-      for(int i = 0; i < filters.get("paths").size() * 2; i+=2) {
-        // check is int or double - filters.get("values").get(i)
-        stmt.setString(i+1, "$." + filters.get("paths").get(i / 2));
 
+      for(int i = 0; i < filters.get("paths").size() * 2; i+=2) {
+        stmt.setString(i+1, "$." + filters.get("paths").get(i / 2));
         String value = filters.get("values").get(i / 2);
 
         if(Utils.isNumeric(value)) {
-          if(value.contains(".")) {
+          if(value.contains(".")) { // with decimals
             try {
               stmt.setDouble(i+2, Double.parseDouble(value));
             } catch (Exception tryFloat) {
@@ -147,7 +200,7 @@ public class Collection<T> {
                 e.printStackTrace();
               }
             }
-          } else {
+          } else { // without decimals
             try {
               stmt.setInt(i+2, Integer.parseInt(value));
             } catch (Exception tryLong) {
@@ -158,17 +211,16 @@ public class Collection<T> {
               }
             }
           }
-        } else {
+        } else { // not a number
           stmt.setString(i+2, value);
         }
       }
       ResultSet rs = stmt.executeQuery();
-      String jsonArray = "[" + rs.getString(1) + "]";
-      return mapper.readValue(jsonArray, mapper.getTypeFactory().constructCollectionType(List.class, klass));
-    } catch (SQLException | JsonProcessingException e) {
+      return "[" + rs.getString(1) + "]";
+    } catch (SQLException e) {
       e.printStackTrace();
     }
-    return new ArrayList<>();
+    return null;
   }
 
   public T findById(String id) {
@@ -177,6 +229,7 @@ public class Collection<T> {
       PreparedStatement stmt = conn.prepareStatement(q);
       stmt.setString(1, id);
       ResultSet rs = stmt.executeQuery();
+
       return mapper.readValue(rs.getString(1), klass);
     } catch (SQLException | JsonProcessingException e) {
       e.printStackTrace();
@@ -192,7 +245,6 @@ public class Collection<T> {
 
   // find sort
   // find filter sort
-  // find return raw json
   // save raw json
   // deleteById
   // delete by filter
@@ -213,17 +265,25 @@ public class Collection<T> {
     filter = filter.replace(" ", "");
     List<String> paths = new ArrayList<>();
     List<String> values = new ArrayList<>();
-    String query = " where" + new Rewriter("([\\w\\.\\[\\]]+)(=~|>=|<=|!=|<|>|=)([\\w\\.\\[\\]]+)(&&|\\|\\|)?") {
+    String query = " where" + new Rewriter("([\\w\\.\\[\\]]+)(=~|>=|<=|!=|<|>|=)([\\w\\.\\[\\]]+)(\\)\\|\\||\\)&&|&&|\\|\\|)?") {
       public String replacement() {
         paths.add(group(1));
         String comparator = group(2) + " ?";
         if (group(2).equals("=~")) {
           comparator = "like ?";
-          values.add("%" + group(3) + "%");
+          String val = group(3);
+          if(val.contains("%") || val.contains("_")) {
+            values.add(val);
+          } else {
+            values.add("%" + val + "%");
+          }
         } else {
           values.add(group(3));
         }
-        String andOr = group(4) == null ? "" : (group(4).equals("&&") ? "and" : "or");
+        String andOr = group(4) == null ? ""
+                : (group(4).equals("&&") ? "and"
+                : group(4).equals("||") ? "or"
+                : group(4).equals(")&&") ? ")and" : ")or");
         return String.format(" json_extract(value, ?) %s %s", comparator, andOr);
       }
     }.rewrite(filter);
