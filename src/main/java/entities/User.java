@@ -1,9 +1,10 @@
 package entities;
 
-import database.Id;
-import database.Model;
+import database.annotations.Id;
+import database.annotations.Document;
+import entities.Cat;
 
-@Model
+@Document
 public class User {
 
   @Id

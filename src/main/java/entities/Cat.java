@@ -1,8 +1,8 @@
 package entities;
 
-import database.Model;
+import database.annotations.Document;
 
-@Model
+@Document
 public class Cat {
 
   private String id;

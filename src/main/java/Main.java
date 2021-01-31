@@ -1,9 +1,7 @@
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import database.Database;
 import entities.Cat;
 import entities.User;
-import utilities.Filter;
 
 import java.io.File;
 import java.io.IOException;
@@ -14,7 +12,18 @@ import static utilities.Filter.*;
 
 public class Main {
   public static void main(String[] args) {
-    var db = new Database();
+//    var db = new Database();
+
+//    collection("map").putIfAbsent("name", "Aarkan");
+//    collection("map").put("name", "Loke");
+//    collection("map").put("age", 32);
+//    collection("map").put("saldo", 123.45);
+//    collection("map").put("dude", new User("Dude", "hej_hopp"));
+//    System.out.println(collection("map").remove("saldo"));
+
+//    System.out.println(collection("map").get("name"));
+//    System.out.println(collection("map").get("saldo"));
+//    System.out.println(collection("map").get("dude"));
 
 //    collection("User").watch(watchData -> {
 //      System.out.println("Entity: " + watchData.getEntity());
@@ -50,7 +59,7 @@ public class Main {
         jsoniter: 5494ms
         jackson:  5483ms
      */
-//    saveUsers(importedUsers, 1);
+//    saveUsers(importedUsers, 3);
 //    System.out.println("saved 1'000 users: " + ((System.currentTimeMillis() - start)) + "ms");
 
     start = System.currentTimeMillis();
@@ -62,30 +71,29 @@ public class Main {
                 eq("cat.race.type", "Houma")
             ),
             not("cat.race.type", "Houma")
-        ), 20, 20).size());
-//    System.out.println(collection("User").find("cat.race.time >= 50 && (cat.race.type =~ ma || cat.race.type = Houma)", 20).size());
+        ), 20).size());
+//    System.out.println(collection("User").find("username=Aarkan&&cat.color=blue", 1));
     System.out.println("find users deep: " + ((System.currentTimeMillis() - start)) + "ms");
 
+    int size = 10000;
     start = System.currentTimeMillis();
-    System.out.println(collection("User").find(200).size());
+    System.out.println(collection("User").find(size).size());
     System.out.println("find all users: " + ((System.currentTimeMillis() - start)) + "ms");
 
     start = System.currentTimeMillis();
-    collection("User").findAsJson(200);
+    collection("User").findAsJson(size);
     System.out.println("findAsJson all users: " + ((System.currentTimeMillis() - start)) + "ms");
-
-    start = System.currentTimeMillis();
-    System.out.println(collection("User").findById("yvhXGcmLXJCztIHAPgdb-"));
-    System.out.println("findById user: " + ((System.currentTimeMillis() - start)) + "ms");
 
   }
 
   private static void saveUsers(User[] users, int iter) {
     for(int i = 0; i < iter; i++) {
-      for(var u : users) {
-        u.setUid(null);
-      }
-      collection("User").save(users);
+//      new Thread(() -> {
+        for(var u : users) {
+          u.setUid(null);
+        }
+        collection("User").save(users);
+//      }).start();
     }
   }
 }
