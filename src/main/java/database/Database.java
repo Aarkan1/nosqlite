@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class Database {
   private static Map<String, Collection<?>> collections = new ConcurrentHashMap<>();
   private static Connection conn;
+  private static DbHelper dbHelper = null;
   private static Database singleton = null;
 
   public Database() {
@@ -28,15 +29,17 @@ public class Database {
 
     try {
       conn = DriverManager.getConnection("jdbc:sqlite:db/data.db");
+      dbHelper = new DbHelper(conn);
     } catch (SQLException e) {
       e.printStackTrace();
+      return;
     }
 
     Set<Class<?>> klasses = new Reflections().getTypesAnnotatedWith(Document.class);
     klasses.forEach(k -> {
       String name = k.getAnnotation(Document.class).collection();
       name = name.equals("default") ? k.getSimpleName() : name;
-      collections.putIfAbsent(name, new Collection(conn, k, name));
+      collections.putIfAbsent(name, new Collection(dbHelper, k, name));
     });
   }
 
@@ -46,7 +49,11 @@ public class Database {
 
   public static Collection collection(String doc) {
     if(singleton == null) singleton = new Database();
-    collections.putIfAbsent(doc, new Collection(conn,null, doc));
-    return collections.get(doc);
+    Collection coll = collections.get(doc);
+    if(coll == null) {
+      coll = new Collection(dbHelper,null, doc);
+      collections.put(doc, coll);
+    }
+    return coll;
   }
 }

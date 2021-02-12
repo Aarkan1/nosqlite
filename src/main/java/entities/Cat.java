@@ -1,10 +1,12 @@
 package entities;
 
 import database.annotations.Document;
+import database.annotations.Id;
 
 @Document
 public class Cat {
 
+  @Id
   private String id;
   private String name;
   private String color;

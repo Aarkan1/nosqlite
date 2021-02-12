@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import database.annotations.Id;
+import database.exceptions.IdAnnotationMissingException;
 import database.exceptions.TypeMismatchException;
 import utilities.Rewriter;
 import utilities.Utils;
@@ -16,139 +17,88 @@ import java.util.*;
 public class Collection<T> {
   private Class<T> klass;
   private String collName;
-  private Connection conn;
-  private List<WatchHandler> watchers = new ArrayList<>();
-  private Map<String, List<WatchHandler>> eventWatchers = new HashMap<>();
+  private DbHelper db;
   private ObjectMapper mapper = new ObjectMapper();
   private String idField;
 
-  Collection(Connection conn, Class<T> klass, String collName) {
+  Collection(DbHelper db, Class<T> klass, String collName) {
     this.klass = klass;
-    this.conn = conn;
+    this.db = db;
     this.collName = collName;
 
-    if(klass != null) {
-      for(Field field : klass.getDeclaredFields()) {
-        if(field.isAnnotationPresent(Id.class)) {
+    if (klass != null) {
+      for (Field field : klass.getDeclaredFields()) {
+        if (field.isAnnotationPresent(Id.class)) {
           idField = field.getName();
           break;
         }
       }
-      if(idField == null) idField = "id";
+      if (idField == null) try {
+        throw new IdAnnotationMissingException("No @Id in " + collName);
+      } catch (IdAnnotationMissingException e) {
+        e.printStackTrace();
+        return;
+      }
     }
-
 
     // ignore failure on field name mismatch
     mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-    try {
 //      conn.createStatement().execute("drop table if exists " + klassName);
-      conn.createStatement().execute("create table if not exists " + this.collName +
-              "(key TEXT PRIMARY KEY UNIQUE NOT NULL, " +
-              "value JSON NOT NULL)");
-    } catch (SQLException e) {
-      e.printStackTrace();
-    }
+    db.run("queryOne", "create table if not exists " + this.collName +
+            "(key TEXT PRIMARY KEY UNIQUE NOT NULL, " +
+            "value JSON NOT NULL)", collName);
   }
 
   public <T1> T1 get(String key, Class<T1> klass) {
     String json = get(key);
-    if(json == null) return null;
-    try {
-      return mapper.readValue(json, klass);
-    } catch (JsonProcessingException e) {
-      e.printStackTrace();
-    }
-    return null;
+    if (json == null) return null;
+    return JSONparse(json, klass);
   }
 
   public String get(String key) {
-    String q = String.format("select value from %1$s where key = ?", collName);
-    try {
-      PreparedStatement stmt = conn.prepareStatement(q);
-      stmt.setString(1, key);
-      ResultSet rs = stmt.executeQuery();
-      return rs.getString(1);
-    } catch (SQLException e) {
-      if(e.getMessage().startsWith("ResultSet closed")) {
-        return null;
-      }
-      e.printStackTrace();
-    }
-    return null;
+    String query = String.format("select value from %1$s where key = ?", collName);
+    Object[] params = {key};
+    return db.get(query, params);
   }
 
   public boolean put(String key, Object value) {
-    try {
-      String json = mapper.writeValueAsString(value);
-      String q = String.format("insert into %s values(?, json(?)) " +
+    String json = JSONstringify(value);
+    String query = String.format("insert into %s values(?, json(?)) " +
             "on conflict(key) do update set value=json(excluded.value)", collName);
-      PreparedStatement stmt = conn.prepareStatement(q);
-      stmt.setString(1, key);
-      stmt.setString(2, json);
-      stmt.executeUpdate();
-      updateWatchers("save", new WatchData(collName, "save", Collections.singletonList(json)));
-      return true;
-    } catch (SQLException | JsonProcessingException e) {
-      e.printStackTrace();
-    }
-    return false;
+    Object[] params = {key, json};
+    return db.run("queryOne", query, params, collName) != null;
   }
 
   public boolean putIfAbsent(String key, Object value) {
-    try {
-      String json = mapper.writeValueAsString(value);
-      String q = String.format("insert into %1$s select ?, json(?)" +
-              " where not exists(select * from %1$s where %1$s.key = ?)", collName);
-      PreparedStatement stmt = conn.prepareStatement(q);
-      stmt.setString(1, key);
-      stmt.setString(2, json);
-      stmt.setString(3, key);
-      stmt.executeUpdate();
-      updateWatchers("save", new WatchData(collName, "save", Collections.singletonList(json)));
-      return true;
-    } catch (SQLException | JsonProcessingException e) {
-      e.printStackTrace();
-    }
-    return false;
+    String json = JSONstringify(value);
+    String query = String.format("insert into %1$s select ?, json(?)" +
+            " where not exists(select * from %1$s where %1$s.key = ?)", collName);
+    Object[] params = {key, json, key};
+    return db.run("queryOne", query, params, collName) != null;
   }
 
   public String remove(String key) {
-    try {
-      String json = get(key);
-      String q = String.format("delete from %1$s where key = ?", collName);
-      PreparedStatement stmt = conn.prepareStatement(q);
-      stmt.setString(1, key);
-      stmt.executeUpdate();
-      updateWatchers("delete", new WatchData(collName, "delete", Collections.singletonList(json)));
-      return json;
-    } catch (SQLException e) {
-      e.printStackTrace();
-    }
-    return null;
+    String json = get(key);
+    String query = String.format("delete from %1$s where key = ?", collName);
+    Object[] params = {key};
+    db.run("queryOne", query, params, collName);
+    return json;
   }
 
   public String save(String json) {
     Map<String, String> field = getIdField();
-    try {
-      String q = String.format("insert into %s values(?, json(json_set(?, '$.%s', ?))) " +
-              "on conflict(key) do update set value=json(excluded.value)", collName, field.get("name"));
-      PreparedStatement stmt = conn.prepareStatement(q);
-      stmt.setString(1, field.get("id"));
-      stmt.setString(2, json);
-      stmt.setString(3, field.get("id"));
-      stmt.executeUpdate();
-      updateWatchers("save", new WatchData(collName, "save", Collections.singletonList(json)));
-      return json;
-    } catch (SQLException e) {
-      e.printStackTrace();
-    }
-    return null;
+    String query = String.format("insert into %s values(?, json(json_set(?, '$.%s', ?))) " +
+            "on conflict(key) do update set value=json(excluded.value)", collName, field.get("name"));
+    Object[] params = {field.get("id"), json, field.get("id")};
+    return db.run("queryOne", query, params, collName);
   }
 
   public T save(Object document) {
+    if (document == null) throw new NullPointerException();
+
     try {
-      if(document.getClass() != klass) {
+      if (document.getClass() != klass) {
         throw new TypeMismatchException(String.format("'%s' cannot be saved in a '%s' collection", document.getClass().getSimpleName(), collName));
       }
     } catch (TypeMismatchException e) {
@@ -157,60 +107,62 @@ public class Collection<T> {
     }
 
     Map<String, String> field = getIdField(document);
-    try {
-      String json = mapper.writeValueAsString(document);
-      String q = String.format("insert into %s values(?, json(?)) " +
-              "on conflict(key) do update set value=json(excluded.value)", collName);
-      PreparedStatement stmt = conn.prepareStatement(q);
-      stmt.setString(1, field.get("id"));
-      stmt.setString(2, json);
-      stmt.executeUpdate();
-      updateWatchers("save", new WatchData(collName, "save", Collections.singletonList(document)));
-    } catch (SQLException | JsonProcessingException e) {
-      e.printStackTrace();
-    }
+    String json = JSONstringify(document);
+    String query = String.format("insert into %s values(?, json(?)) " +
+            "on conflict(key) do update set value=json(excluded.value)", collName);
+    Object[] params = {field.get("id"), json};
+    db.run("queryOne", query, params, collName);
     return (T) document;
   }
 
-  public synchronized T save(Object[] documents) {
-    try {
-      if(documents[0].getClass() != klass) {
-        throw new TypeMismatchException(String.format("'%s' cannot be saved in a '%s' collection", documents[0].getClass().getSimpleName(), collName));
-      }
+  public List<T> save(List<T> documents) {
+    if (documents == null) throw new NullPointerException();
+    return Arrays.asList(save(documents.toArray()));
+  }
+
+  public T[] save(Object[] documents) {
+    if (documents == null) throw new NullPointerException();
+    for (Object doc : documents) if (doc == null) throw new NullPointerException();
+
+    if (documents[0].getClass() != klass) try {
+      throw new TypeMismatchException(String.format("'%s' cannot be saved in a '%s' collection", documents[0].getClass().getSimpleName(), collName));
     } catch (TypeMismatchException e) {
       e.printStackTrace();
       return null;
     }
-
-    try {
-      conn.setAutoCommit(false);
-      String q = "insert into "+ collName +" values(?, json(?)) " +
-              "on conflict(key) do update set value=json(excluded.value)";
-      PreparedStatement stmt = conn.prepareStatement(q);
-
-      for(Object model : documents) {
-        Map<String, String> field = getIdField(model);
-        String json = mapper.writeValueAsString(model);
-
-        stmt.setString(1, field.get("id"));
-        stmt.setString(2, json);
-        stmt.executeUpdate();
-      }
-
-      conn.commit();
-      stmt.close();
-
-      updateWatchers("save", new WatchData(collName, "save", Arrays.asList(documents)));
-    } catch (SQLException | JsonProcessingException e) {
-      e.printStackTrace();
-    } finally {
-      try {
-        conn.setAutoCommit(true);
-      } catch (SQLException e) {
-        e.printStackTrace();
-      }
-    }
-    return (T) documents;
+    String q = "insert into " + collName + " values(?, json(?)) " +
+            "on conflict(key) do update set value=json(excluded.value)";
+    db.run("queryMany", q, documents, collName);
+//
+//    try {
+//      db.conn.setAutoCommit(false);
+//      String q = "insert into " + collName + " values(?, json(?)) " +
+//              "on conflict(key) do update set value=json(excluded.value)";
+//      PreparedStatement stmt = db.conn.prepareStatement(q);
+//
+//      for (Object model : documents) {
+//        Map<String, String> field = getIdField(model);
+//        String json = mapper.writeValueAsString(model);
+//
+//        stmt.setString(1, field.get("id"));
+//        stmt.setString(2, json);
+//        stmt.executeUpdate();
+//      }
+//
+//      db.conn.commit();
+//      stmt.close();
+//
+//      db.updateWatchers("save", new WatchData(collName, "save", Arrays.asList(documents)));
+//    } catch (SQLException | JsonProcessingException e) {
+//      e.printStackTrace();
+//    } finally {
+//      try {
+//        db.conn.setAutoCommit(true);
+//      } catch (SQLException e) {
+//        e.printStackTrace();
+//      }
+//    }
+    return (T[]) documents;
   }
 
   public List<T> find() {
@@ -223,7 +175,7 @@ public class Collection<T> {
 
   public List<T> find(int limit, int offset) {
     String jsonArray = findAsJson(null, limit, offset);
-    if(jsonArray == null) return new ArrayList<>();
+    if (jsonArray == null) return new ArrayList<>();
     try {
       return mapper.readValue(jsonArray, mapper.getTypeFactory().constructCollectionType(List.class, klass));
     } catch (JsonProcessingException e) {
@@ -242,7 +194,7 @@ public class Collection<T> {
 
   public List<T> find(String filter, int limit, int offset) {
     String jsonArray = findAsJson(filter, limit, offset);
-    if(jsonArray == null) return new ArrayList<>();
+    if (jsonArray == null) return new ArrayList<>();
     try {
       return mapper.readValue(jsonArray, mapper.getTypeFactory().constructCollectionType(List.class, klass));
     } catch (JsonProcessingException e) {
@@ -280,63 +232,54 @@ public class Collection<T> {
   }
 
   public String findOneAsJson(String filter, int limit, int offset) {
-    try {
-      if(filter == null) {
-        ResultSet rs = conn.createStatement().executeQuery(
-                String.format("select group_concat(value) from (select value from %1$s" + (limit == 0 ? ")" : " limit %2$d offset %3$d)"),
-                        collName, limit, offset));
-        return rs.getString(1);
-      }
+    if (filter == null) {
+      return db.get(String.format("select group_concat(value) from (select value from %1$s" +
+              (limit == 0 ? ")" : " limit %2$d offset %3$d)"), collName, limit, offset));
+    }
 
-      Map<String, List<String>> filters = generateWhereClause(filter);
-      String q = String.format("select group_concat(value) from (select value from %1$s"
-              + filters.get("query").get(0) + (limit == 0 ? ")" : " limit %2$d offset %3$d)"), collName, limit, offset);
-      PreparedStatement stmt = conn.prepareStatement(q);
+    Map<String, List<String>> filters = generateWhereClause(filter);
+    String q = String.format("select group_concat(value) from (select value from %1$s"
+            + filters.get("query").get(0) + (limit == 0 ? ")" : " limit %2$d offset %3$d)"), collName, limit, offset);
 
-      for(int i = 0; i < filters.get("paths").size() * 2; i+=2) {
-        stmt.setString(i+1, "$." + filters.get("paths").get(i / 2));
-        String value = filters.get("values").get(i / 2);
+    List params = new ArrayList();
 
-        if(Utils.isNumeric(value)) {
-          if(value.contains(".")) { // with decimals
+    for (int i = 0; i < filters.get("paths").size(); i++) {
+      params.add(filters.get("paths").get(i));
+      String value = filters.get("values").get(i);
+
+      if (Utils.isNumeric(value)) {
+        if (value.contains(".")) { // with decimals
+          try {
+            params.add(Double.parseDouble(value));
+          } catch (Exception tryFloat) {
             try {
-              stmt.setDouble(i+2, Double.parseDouble(value));
-            } catch (Exception tryFloat) {
-              try {
-                stmt.setFloat(i+2, Float.parseFloat(value));
-              } catch (Exception e) {
-                e.printStackTrace();
-              }
-            }
-          } else { // without decimals
-            try {
-              stmt.setInt(i+2, Integer.parseInt(value));
-            } catch (Exception tryLong) {
-              try {
-                stmt.setLong(i+2, Long.parseLong(value));
-              } catch (Exception e) {
-                e.printStackTrace();
-              }
+              params.add(Float.parseFloat(value));
+            } catch (Exception e) {
+              e.printStackTrace();
             }
           }
-        } else { // not a number
-          stmt.setString(i+2, value);
+        } else { // without decimals
+          try {
+            params.add(Integer.parseInt(value));
+          } catch (Exception tryLong) {
+            try {
+              params.add(Long.parseLong(value));
+            } catch (Exception e) {
+              e.printStackTrace();
+            }
+          }
         }
+      } else { // not a number
+        params.add(value);
       }
-      ResultSet rs = stmt.executeQuery();
-      return rs.getString(1);
-    } catch (SQLException e) {
-      if(e.getMessage().startsWith("ResultSet closed")) {
-        return null;
-      }
-      e.printStackTrace();
     }
-    return null;
+
+    return db.get(q, params.toArray());
   }
 
   public T findById(String id) {
     String json = findByIdAsJson(id);
-    if(json == null) return null;
+    if (json == null) return null;
     try {
       return mapper.readValue(json, klass);
     } catch (JsonProcessingException e) {
@@ -346,153 +289,120 @@ public class Collection<T> {
   }
 
   public String findByIdAsJson(String id) {
-    try {
-      String q = String.format("select value from %1$s where key=? limit 1", collName);
-      PreparedStatement stmt = conn.prepareStatement(q);
-      stmt.setString(1, id);
-      ResultSet rs = stmt.executeQuery();
-      return rs.getString(1);
-    } catch (SQLException e) {
-      if(e.getMessage().startsWith("ResultSet closed")) {
-        return null;
-      }
-      e.printStackTrace();
-    }
-    return null;
+    if (id == null) throw new NullPointerException();
+    String query = String.format("select value from %1$s where key=? limit 1", collName);
+    Object[] params = {id};
+    return db.get(query, params);
   }
 
   public boolean delete(Object document) {
-    if(document == null) return false;
+    if (document == null) throw new NullPointerException();
 
     Map<String, String> field = getIdField(document);
-    try {
-      String q = String.format("delete from %1$s where key = ?", collName);
-      PreparedStatement stmt = conn.prepareStatement(q);
-      stmt.setString(1, field.get("id"));
-      stmt.executeUpdate();
-      updateWatchers("delete", new WatchData(collName, "delete", Collections.singletonList(document)));
-      return true;
-    } catch (SQLException e) {
-      e.printStackTrace();
-    }
-    return false;
+    String q = String.format("delete from %1$s where key = ?", collName);
+    Object[] params = {field.get("id")};
+    return db.run("queryOne", q, params, collName) != null;
   }
 
   public boolean deleteById(String id) {
-    try {
-      String deletedDoc = findByIdAsJson(id);
-      String q = String.format("delete from %1$s where key = ?", collName);
-      PreparedStatement stmt = conn.prepareStatement(q);
-      stmt.setString(1, id);
-      stmt.executeUpdate();
-      updateWatchers("delete", new WatchData(collName, "delete", Collections.singletonList(deletedDoc)));
-      return true;
-    } catch (SQLException e) {
-      e.printStackTrace();
-    }
-    return false;
+    if (id == null) throw new NullPointerException();
+    String q = String.format("delete from %1$s where key = ?", collName);
+    Object[] params = {id};
+    return db.run("queryOne", q, params, collName) != null;
   }
 
   public boolean deleteOne(String filter) {
-    String deletedDoc = findOneAsJson(filter);
-    boolean deleted = deleteDocs(filter, 1);
-    if(deleted) updateWatchers("delete", new WatchData(collName, "delete", Collections.singletonList(deletedDoc)));
-    return deleted;
+    return deleteDocs(filter, 1);
   }
 
   public boolean delete(String filter) {
-    String deletedDocs = findAsJson(filter);
-    boolean deleted = deleteDocs(filter, 0);
-    if(deleted) updateWatchers("delete", new WatchData(collName, "delete", Collections.singletonList(deletedDocs)));
-    return deleted;
+    return deleteDocs(filter, 0);
   }
 
   public boolean delete() {
-    String deletedDocs = findAsJson();
-    boolean deleted = deleteDocs(null, 0);
-    if(deleted) updateWatchers("delete", new WatchData(collName, "delete", Collections.singletonList(deletedDocs)));
-    return deleted;
+    return deleteDocs(null, 0);
   }
 
   private boolean deleteDocs(String filter, int limit) {
-    try {
-      if(filter == null) {
-        ResultSet rs = conn.createStatement().executeQuery(
-                String.format("delete from %1$s", collName));
-        return true;
-      }
+    if (filter == null) {
+      return db.run("queryOne", String.format("delete from %1$s", collName), collName) != null;
+    }
 
-      Map<String, List<String>> filters = generateWhereClause(filter);
-      String q;
-      if(limit == 0) {
-        q = String.format("delete from %1$s" + filters.get("query").get(0), collName);
-      } else {
-        q = String.format("delete from %1$s where %1$s.key = (select %1$s.key from %1$s"
+    Map<String, List<String>> filters = generateWhereClause(filter);
+    String q;
+    if (limit == 0) {
+      q = String.format("delete from %1$s" + filters.get("query").get(0), collName);
+    } else {
+      q = String.format("delete from %1$s where %1$s.key = (select %1$s.key from %1$s"
               + filters.get("query").get(0) + " limit %2$d)", collName, limit);
-      }
-      PreparedStatement stmt = conn.prepareStatement(q);
+    }
+    List params = new ArrayList();
 
-      for(int i = 0; i < filters.get("paths").size() * 2; i+=2) {
-        stmt.setString(i+1, "$." + filters.get("paths").get(i / 2));
-        String value = filters.get("values").get(i / 2);
+    for (int i = 0; i < filters.get("paths").size(); i++) {
+      params.add(filters.get("paths").get(i));
+      String value = filters.get("values").get(i);
 
-        if(Utils.isNumeric(value)) {
-          if(value.contains(".")) { // with decimals
+      if (Utils.isNumeric(value)) {
+        if (value.contains(".")) { // with decimals
+          try {
+            params.add(Double.parseDouble(value));
+          } catch (Exception tryFloat) {
             try {
-              stmt.setDouble(i+2, Double.parseDouble(value));
-            } catch (Exception tryFloat) {
-              try {
-                stmt.setFloat(i+2, Float.parseFloat(value));
-              } catch (Exception e) {
-                e.printStackTrace();
-              }
-            }
-          } else { // without decimals
-            try {
-              stmt.setInt(i+2, Integer.parseInt(value));
-            } catch (Exception tryLong) {
-              try {
-                stmt.setLong(i+2, Long.parseLong(value));
-              } catch (Exception e) {
-                e.printStackTrace();
-              }
+              params.add(Float.parseFloat(value));
+            } catch (Exception e) {
+              e.printStackTrace();
             }
           }
-        } else { // not a number
-          stmt.setString(i+2, value);
+        } else { // without decimals
+          try {
+            params.add(Integer.parseInt(value));
+          } catch (Exception tryLong) {
+            try {
+              params.add(Long.parseLong(value));
+            } catch (Exception e) {
+              e.printStackTrace();
+            }
+          }
         }
+      } else { // not a number
+        params.add(value);
       }
-      stmt.executeUpdate();
-      return true;
-    } catch (SQLException e) {
-      e.printStackTrace();
     }
-    return false;
+
+    return db.run("queryOne", q, params.toArray(), collName) != null;
   }
 
   // find sort
   // find filter sort
-  // deleteById
-  // delete by filter
   // change field name
   // update single field - update User set value = json_set(value, '$.cat.color', 'blue')
   // updateById single field - update User set value = json_set(value, '$.cat.color', 'blue') where key = id
   // remove single field - update User set value = json_remove(value, '$.cat.color')
 
   public void watch(WatchHandler watcher) {
-    watchers.add(watcher);
+    db.watch(watcher);
   }
 
   public void watch(String event, WatchHandler watcher) {
-    eventWatchers.putIfAbsent(event, new ArrayList<>());
-    eventWatchers.get(event).add(watcher);
+    db.watch(event, watcher);
   }
 
-  private void updateWatchers(String event, WatchData watchData) {
-    if(eventWatchers.get(event) != null) {
-      eventWatchers.get(event).forEach(w -> w.handle(watchData));
+  private String JSONstringify(Object value) {
+    try {
+      return mapper.writeValueAsString(value);
+    } catch (JsonProcessingException e) {
+      e.printStackTrace();
+      return null;
     }
-    watchers.forEach(w -> w.handle(watchData));
+  }
+
+  private <T2> T2 JSONparse(String json, Class<T2> klass) {
+    try {
+      return mapper.readValue(json, klass);
+    } catch (JsonProcessingException e) {
+      e.printStackTrace();
+      return null;
+    }
   }
 
   private Map<String, List<String>> generateWhereClause(String filter) {
@@ -501,12 +411,12 @@ public class Collection<T> {
     List<String> values = new ArrayList<>();
     String query = " where" + new Rewriter("([\\w\\.\\[\\]]+)(=~|>=|<=|!=|<|>|=)([\\w\\.\\[\\]]+)(\\)\\|\\||\\)&&|&&|\\|\\|)?") {
       public String replacement() {
-        paths.add(group(1));
+        paths.add("$." + group(1));
         String comparator = group(2) + " ?";
         if (group(2).equals("=~")) {
           comparator = "like ?";
           String val = group(3);
-          if(val.contains("%") || val.contains("_")) {
+          if (val.contains("%") || val.contains("_")) {
             values.add(val);
           } else {
             values.add("%" + val + "%");
@@ -542,7 +452,7 @@ public class Collection<T> {
   private Map<String, String> getIdField(Object model) {
     Map<String, String> idValues = new HashMap<>();
 
-    if(idField != null) {
+    if (idField != null) {
       try {
         Field field = model.getClass().getDeclaredField(idField);
         field.setAccessible(true);
@@ -557,10 +467,10 @@ public class Collection<T> {
       }
     } else { // @Id has a custom field name
       try {
-        for(Field field : model.getClass().getDeclaredFields()) {
-          if(field.isAnnotationPresent(Id.class)) {
+        for (Field field : model.getClass().getDeclaredFields()) {
+          if (field.isAnnotationPresent(Id.class)) {
             field.setAccessible(true);
-            if(field.get(model) == null) {
+            if (field.get(model) == null) {
               // generate random id
               field.set(model, NanoIdUtils.randomNanoId());
             }

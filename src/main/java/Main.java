@@ -1,3 +1,4 @@
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import entities.Cat;
@@ -11,12 +12,12 @@ import static database.Database.collection;
 import static utilities.Filter.*;
 
 public class Main {
-  public static void main(String[] args) {
+  public static void main(String[] args) throws IOException {
 //    var db = new Database();
 
-//    collection("map").putIfAbsent("name", "Aarkan");
-//    collection("map").put("name", "Loke");
-//    collection("map").put("age", 32);
+//    collection("map").putIfAbsent("name", "Tea");
+//    collection("map").put("name", "Aarkan");
+//    collection("map").put("age", 22);
 //    collection("map").put("saldo", 123.45);
 //    collection("map").put("dude", new User("Dude", "hej_hopp"));
 //    System.out.println(collection("map").remove("saldo"));
@@ -48,9 +49,9 @@ public class Main {
     var cat = new Cat("Bamse", "Pink");
     user.setCat(cat);
 
-//    collection("User").save(cat);
+//    collection("Cat").save(cat);
 //    collection("User").save(user);
-//    collection("User").save(user);
+    collection("User").save(user);
 
     start = System.currentTimeMillis();
 
@@ -59,7 +60,8 @@ public class Main {
         jsoniter: 5494ms
         jackson:  5483ms
      */
-//    saveUsers(importedUsers, 3);
+//    collection("User").delete();
+//      saveUsers(importedUsers, 3);
 //    System.out.println("saved 1'000 users: " + ((System.currentTimeMillis() - start)) + "ms");
 
     start = System.currentTimeMillis();
@@ -71,29 +73,40 @@ public class Main {
                 eq("cat.race.type", "Houma")
             ),
             not("cat.race.type", "Houma")
-        ), 20).size());
-//    System.out.println(collection("User").find("username=Aarkan&&cat.color=blue", 1));
+        ), 50).size());
+//    System.out.println(collection("User").find("cat.name=~lo&&cat.race.type=Houma", 20));
     System.out.println("find users deep: " + ((System.currentTimeMillis() - start)) + "ms");
 
-    int size = 10000;
+    int size = 1000;
     start = System.currentTimeMillis();
     System.out.println(collection("User").find(size).size());
-    System.out.println("find all users: " + ((System.currentTimeMillis() - start)) + "ms");
+    System.out.println("find "+size+" users: " + ((System.currentTimeMillis() - start)) + "ms");
 
     start = System.currentTimeMillis();
     collection("User").findAsJson(size);
-    System.out.println("findAsJson all users: " + ((System.currentTimeMillis() - start)) + "ms");
-
+    System.out.println("findAsJson "+size+" users: " + ((System.currentTimeMillis() - start)) + "ms");
   }
 
-  private static void saveUsers(User[] users, int iter) {
+  private static void saveUsers(User[] users, int iter) throws IOException {
+    ObjectMapper mapper = new ObjectMapper();
+    collection("User").find(10);
+    System.out.println("before saveUsers: " + collection("User").find().size());
+    long start = System.currentTimeMillis();
     for(int i = 0; i < iter; i++) {
+      User[] copy = mapper.readValue(mapper.writeValueAsBytes(users), User[].class);
+      for(var u : copy) {
+      new Thread(() -> {
+        u.setUid(null);
+        collection("User").save(u);
+      }).start();
+      }
+//        collection("User").save(copy);
+
 //      new Thread(() -> {
-        for(var u : users) {
-          u.setUid(null);
-        }
-        collection("User").save(users);
+//        System.out.println("Concurrent read " + collection("User").find(100).size());
 //      }).start();
     }
+//    System.out.println("commit users: " + ((System.currentTimeMillis() - start)) + "ms");
+//    System.out.println("after saveUsers: " + collection("User").find().size());
   }
 }
