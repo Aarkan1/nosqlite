@@ -111,8 +111,21 @@ class DbHelper extends Thread {
         setParams(i + 1, params[i], stmt);
       }
     }
-    stmt.executeUpdate();
 
+    // fetch doc before delete
+    if (query.startsWith("delete")) {
+      String doc;
+      if (params == null) {
+        doc = "deleted all";
+      } else {
+        Object[] id = {params[0]};
+        doc = get("select value from " + collName + " where key = ?", id);
+      }
+      stmt.executeUpdate();
+      return doc;
+    }
+
+    stmt.executeUpdate();
     if (params == null) return null;
     Object[] id = {params[0]};
     return get("select value from " + collName + " where key = ?", id);
@@ -134,7 +147,10 @@ class DbHelper extends Thread {
       ResultSet rs = stmt.executeQuery();
       return rs.getString(1);
     } catch (SQLException e) {
-      e.printStackTrace();
+      // no document found
+      if(!e.getMessage().equals("ResultSet closed")) {
+        e.printStackTrace();
+      }
     }
     return null;
   }

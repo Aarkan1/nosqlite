@@ -52,6 +52,7 @@ public class Main {
 //    collection("Cat").save(cat);
 //    collection("User").save(user);
     collection("User").save(user);
+    System.out.println("deleted user: " + collection("User").delete(user));
 
     start = System.currentTimeMillis();
 
