@@ -66,7 +66,7 @@ public class User {
   @Override
   public String toString() {
     return "\nUser{" +
-            "id=" + uid +
+            "uid=" + uid +
             ", username='" + username + '\'' +
             ", password='" + password + '\'' +
             ", cat='" + cat + '\'' +

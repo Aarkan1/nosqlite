@@ -82,6 +82,7 @@ public class Cat {
             "id=" + id +
             ", name='" + name + '\'' +
             ", color='" + color + '\'' +
+            ", age='" + age + '\'' +
             ", race='" + race + '\'' +
             '}';
   }

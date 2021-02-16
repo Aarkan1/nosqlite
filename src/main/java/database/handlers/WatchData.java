@@ -1,4 +1,4 @@
-package database;
+package database.handlers;
 
 import java.util.List;
 

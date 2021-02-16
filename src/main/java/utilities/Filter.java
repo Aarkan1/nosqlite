@@ -1,5 +1,8 @@
 package utilities;
 
+import java.util.Arrays;
+import java.util.regex.Pattern;
+
 public abstract class Filter {
   public static String eq(String field, Object value) {
     return field + "=" + value;
@@ -27,6 +30,12 @@ public abstract class Filter {
 
   public static String text(String field, Object value) {
     return field + "=~" + value;
+  }
+
+  public static String regex(String field, String regex) { return field + "~~" + regex; }
+
+  public static String in(String field, Object... values) {
+    return field + "==" + Arrays.asList(values) ;
   }
 
   public static String and(String... filters) {

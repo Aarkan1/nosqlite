@@ -1,4 +1,6 @@
-package database;
+package database.handlers;
+
+import database.handlers.WatchData;
 
 @FunctionalInterface
 public interface WatchHandler {

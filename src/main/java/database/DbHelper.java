@@ -4,6 +4,9 @@ import com.aventrix.jnanoid.jnanoid.NanoIdUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import database.annotations.Id;
+import database.handlers.WatchData;
+import database.handlers.WatchHandler;
+import org.sqlite.Function;
 
 import java.io.InputStream;
 import java.lang.reflect.Field;
@@ -15,9 +18,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
 
 class DbHelper extends Thread {
-  private Connection conn;
+  Connection conn;
   private BlockingDeque<Task> tasks = new LinkedBlockingDeque<>();
   private List<WatchHandler> watchers = new ArrayList<>();
   private Map<String, List<WatchHandler>> eventWatchers = new HashMap<>();
@@ -49,8 +53,10 @@ class DbHelper extends Thread {
    *
    * @param conn The database connection
    */
-  DbHelper(Connection conn) {
+  DbHelper(Connection conn) throws SQLException {
     this.conn = conn;
+    boolean useRegex = true;
+    if(useRegex) addRegex(conn);
 
     new Thread(() -> {
       while (isRunning.get() || !tasks.isEmpty()) {
@@ -84,12 +90,12 @@ class DbHelper extends Thread {
     CompletableFuture<String> future = new CompletableFuture<>();
     tasks.add(new Task(method, query, params, collName, future));
     try {
-      if (!query.startsWith("create")) {
+      if (!query.startsWith("CREATE")) {
         String doc = future.get();
         String event = "save";
-        if (query.startsWith("insert")) event = "save";
-        if (query.startsWith("delete")) event = "delete";
-        if (query.startsWith("update")) event = "update";
+        if (query.startsWith("INSERT")) event = "save";
+        if (query.startsWith("DELETE")) event = "delete";
+        if (query.startsWith("UPDATE")) event = "update";
 
         updateWatchers(event, new WatchData(collName, event, Collections.singletonList(doc)));
         return doc;
@@ -113,13 +119,13 @@ class DbHelper extends Thread {
     }
 
     // fetch doc before delete
-    if (query.startsWith("delete")) {
+    if (query.startsWith("DELETE")) {
       String doc;
       if (params == null) {
         doc = "deleted all";
       } else {
         Object[] id = {params[0]};
-        doc = get("select value from " + collName + " where key = ?", id);
+        doc = get("SELECT value FROM " + collName + " WHERE key = ?", id);
       }
       stmt.executeUpdate();
       return doc;
@@ -127,8 +133,21 @@ class DbHelper extends Thread {
 
     stmt.executeUpdate();
     if (params == null) return null;
-    Object[] id = {params[0]};
-    return get("select value from " + collName + " where key = ?", id);
+
+    if (query.startsWith("INSERT")) {
+      Object[] id = {params[0]};
+      return get("SELECT value FROM " + collName + " WHERE key = ?", id);
+    }
+
+    System.out.println(query);
+
+    String where = " " + query.substring(query.indexOf("WHERE"));
+    Object[] p = new Object[params.length - 2];
+    for(int i = 2; i < params.length; i++) {
+      p[i - 2] = params[i];
+    }
+
+    return get("SELECT value FROM " + collName + where, p);
   }
 
   // get don't require thread safety
@@ -149,6 +168,8 @@ class DbHelper extends Thread {
     } catch (SQLException e) {
       // no document found
       if(!e.getMessage().equals("ResultSet closed")) {
+        // TODO: Print useful message for bad search query
+        // debug
         e.printStackTrace();
       }
     }
@@ -258,5 +279,21 @@ class DbHelper extends Thread {
       e.printStackTrace();
     }
     return idValues;
+  }
+
+  private void addRegex(Connection conn) throws SQLException {
+    // Create regexp() function to make the REGEXP operator available
+    Function.create(conn, "REGEXP", new Function() {
+      @Override
+      protected void xFunc() throws SQLException {
+        String expression = value_text(0);
+        String value = value_text(1);
+        if (value == null)
+          value = "";
+
+        Pattern pattern=Pattern.compile(expression);
+        result(pattern.matcher(value).find() ? 1 : 0);
+      }
+    });
   }
 }

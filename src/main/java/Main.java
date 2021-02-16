@@ -1,4 +1,3 @@
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import entities.Cat;
@@ -32,7 +31,9 @@ public class Main {
 //      System.out.println("Data: " + watchData.getData());
 //    });
 
+
     long start = System.currentTimeMillis();
+    System.out.println("users size: " + collection("User").size() + ", found in " + ((System.currentTimeMillis() - start)) + "ms");
 
     User[] importedUsers = null;
     try {
@@ -51,10 +52,19 @@ public class Main {
 
 //    collection("Cat").save(cat);
 //    collection("User").save(user);
-    collection("User").save(user);
-    System.out.println("deleted user: " + collection("User").delete(user));
+//    System.out.println(collection("User").save(user));
+//    System.out.println("deleted user: " + collection("User").delete(user));
 
     start = System.currentTimeMillis();
+    System.out.println("update: " + collection("User").updateFieldById("MfVq94kpyGRW22QHiFfY7", "username", "Aarkan"));
+    System.out.println("update field: " + ((System.currentTimeMillis() - start)) + "ms");
+
+    start = System.currentTimeMillis();
+    System.out.println("update: " + collection("User").updateField("uid=MfVq94kpyGRW22QHiFfY7", "cat.color", "Gray"));
+    System.out.println("update field: " + ((System.currentTimeMillis() - start)) + "ms");
+
+//    System.out.println("number of users: " + collection("User").find().size());
+//    System.out.println("find all users: " + ((System.currentTimeMillis() - start)) + "ms");
 
     /*
         saved 1'000 users
@@ -62,11 +72,12 @@ public class Main {
         jackson:  5483ms
      */
 //    collection("User").delete();
-//      saveUsers(importedUsers, 3);
+//      saveUsers(importedUsers, 1);
 //    System.out.println("saved 1'000 users: " + ((System.currentTimeMillis() - start)) + "ms");
 
     start = System.currentTimeMillis();
-    System.out.println(collection("User").find(
+    int deepNumber = 100;
+    collection("User").find(
         and(
             gte("cat.race.time", 50),
             or(
@@ -74,34 +85,58 @@ public class Main {
                 eq("cat.race.type", "Houma")
             ),
             not("cat.race.type", "Houma")
-        ), 50).size());
-//    System.out.println(collection("User").find("cat.name=~lo&&cat.race.type=Houma", 20));
-    System.out.println("find users deep: " + ((System.currentTimeMillis() - start)) + "ms");
+        ), deepNumber).size();
+
+    System.out.println("find "+deepNumber+" with deep search: " + ((System.currentTimeMillis() - start)) + "ms");
+//    Object[] values = {"1","2","3"};
+//    System.out.println(collection("User").find("cat.race.time==[55,2,88,6,7]", 50));
+//    System.out.println(collection("User").find("username=Salvador", 10));
+
+//    System.out.println(regex("cat.name", "^Bad[a-z]*"));
+
+//    System.out.println(in("cat.age", 2,5));
+//    System.out.println(in("cat.age", values));
+    start = System.currentTimeMillis();
+    collection("User").find("username~~^Sa", deepNumber);
+    System.out.println("find "+deepNumber+" users with regex: " + ((System.currentTimeMillis() - start)) + "ms");
+
 
     int size = 1000;
     start = System.currentTimeMillis();
-    System.out.println(collection("User").find(size).size());
+    collection("User").find(size, 0);
     System.out.println("find "+size+" users: " + ((System.currentTimeMillis() - start)) + "ms");
 
     start = System.currentTimeMillis();
-    collection("User").findAsJson(size);
+    collection("User").findAsJson(size, 0);
     System.out.println("findAsJson "+size+" users: " + ((System.currentTimeMillis() - start)) + "ms");
+
+    start = System.currentTimeMillis();
+    System.out.println(collection("User").find("username=~ma", null, 10, 0).size());
+    System.out.println("find with sort: " + ((System.currentTimeMillis() - start)) + "ms");
+
+    start = System.currentTimeMillis();
+    System.out.println(collection("User").find(op -> {
+      op.filter = "username=~ma";
+//      op.sort = "cat.age<";
+      op.limit = 10;
+    }).size());
+    System.out.println("find with options: " + ((System.currentTimeMillis() - start)) + "ms");
   }
 
   private static void saveUsers(User[] users, int iter) throws IOException {
     ObjectMapper mapper = new ObjectMapper();
-    collection("User").find(10);
+    collection("User").find(10, 0);
     System.out.println("before saveUsers: " + collection("User").find().size());
     long start = System.currentTimeMillis();
     for(int i = 0; i < iter; i++) {
       User[] copy = mapper.readValue(mapper.writeValueAsBytes(users), User[].class);
       for(var u : copy) {
-      new Thread(() -> {
+//      new Thread(() -> {
         u.setUid(null);
-        collection("User").save(u);
-      }).start();
+//        collection("User").save(u);
+//      }).start();
       }
-//        collection("User").save(copy);
+        collection("User").save(copy);
 
 //      new Thread(() -> {
 //        System.out.println("Concurrent read " + collection("User").find(100).size());
