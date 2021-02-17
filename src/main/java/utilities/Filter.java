@@ -1,7 +1,6 @@
 package utilities;
 
 import java.util.Arrays;
-import java.util.regex.Pattern;
 
 public abstract class Filter {
   public static String eq(String field, Object value) {

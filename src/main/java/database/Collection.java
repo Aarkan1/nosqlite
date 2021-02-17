@@ -46,12 +46,15 @@ public class Collection<T> {
     mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
 //      conn.createStatement().execute("drop table if exists " + klassName);
-    db.run("queryOne", "CREATE TABLE IF NOT EXISTS " + this.collName +
+    db.run("create", "CREATE TABLE IF NOT EXISTS " + this.collName +
             "(key TEXT PRIMARY KEY UNIQUE NOT NULL, " +
-            "value JSON NOT NULL)", collName);
+            "value JSON NOT NULL)", klass);
 
     // index id field
-    db.run("queryOne", "CREATE INDEX IF NOT EXISTS "+collName+"_idx ON "+collName+"(JSON_EXTRACT(value, '$."+idField+"'))", null, collName);
+    if(idField != null) {
+      Object[] params = {"$." + idField};
+      db.run("create", "CREATE INDEX IF NOT EXISTS "+collName+"_idx ON "+collName+"(json_extract(value, ?))", params, klass);
+    }
   }
 
   public <T1> T1 get(String key, Class<T1> klass) {
@@ -66,27 +69,27 @@ public class Collection<T> {
     return db.get(query, params);
   }
 
-  public boolean put(String key, Object value) {
+  public String put(String key, Object value) {
     String json = JSONstringify(value);
     String query = String.format("INSERT INTO %s values(?, json(?)) " +
             "ON CONFLICT(key) DO UPDATE SET value=json(excluded.value)", collName);
     Object[] params = {key, json};
-    return db.run("queryOne", query, params, collName) != null;
+    return db.run("insert", query, params, klass);
   }
 
-  public boolean putIfAbsent(String key, Object value) {
+  public String putIfAbsent(String key, Object value) {
     String json = JSONstringify(value);
     String query = String.format("INSERT INTO %1$s SELECT ?, json(?)" +
             " WHERE NOT EXISTS(SELECT * FROM %1$s WHERE %1$s.key = ?)", collName);
     Object[] params = {key, json, key};
-    return db.run("queryOne", query, params, collName) != null;
+    return db.run("insert", query, params, klass);
   }
 
   public String remove(String key) {
     String json = get(key);
     String query = String.format("DELETE FROM %1$s WHERE key = ?", collName);
     Object[] params = {key};
-    db.run("queryOne", query, params, collName);
+    db.run("delete", query, params, klass);
     return json;
   }
 
@@ -95,7 +98,7 @@ public class Collection<T> {
     String query = String.format("INSERT INTO %s VALUES(?, json(json_set(?, '$.%s', ?))) " +
             "ON CONFLICT(key) DO UPDATE SET value=json(excluded.value)", collName, field.get("name"));
     Object[] params = {field.get("id"), json, field.get("id")};
-    return db.run("queryOne", query, params, collName);
+    return db.run("insert", query, params, klass);
   }
 
   public T save(Object document) {
@@ -115,7 +118,7 @@ public class Collection<T> {
     String query = String.format("INSERT INTO %s VALUES(?, json(?)) " +
             "ON CONFLICT(key) DO UPDATE SET value=json(excluded.value)", collName);
     Object[] params = {field.get("id"), json};
-    db.run("queryOne", query, params, collName);
+    db.run("insert", query, params, klass);
     return (T) document;
   }
 
@@ -136,7 +139,7 @@ public class Collection<T> {
     }
     String q = "INSERT INTO " + collName + " VALUES(?, json(?)) " +
             "ON CONFLICT(key) DO UPDATE SET value=json(excluded.value)";
-    db.run("queryMany", q, documents, collName);
+    db.run("queryMany", q, documents, klass);
     return (T[]) documents;
   }
 
@@ -281,14 +284,14 @@ public class Collection<T> {
     Map<String, String> field = getIdField(document);
     String q = String.format("DELETE FROM %1$s WHERE key=?", collName);
     Object[] params = {field.get("id")};
-    return db.run("queryOne", q, params, collName);
+    return db.run("delete", q, params, klass);
   }
 
   public String deleteById(String id) {
     if (id == null) throw new NullPointerException();
     String q = String.format("DELETE FROM %1$s WHERE key=?", collName);
     Object[] params = {id};
-    return db.run("queryOne", q, params, collName);
+    return db.run("delete", q, params, klass);
   }
 
   public String deleteOne(String filter) {
@@ -311,7 +314,7 @@ public class Collection<T> {
 
   private String deleteDocs(String filter, int limit) {
     if (filter == null) {
-      return db.run("queryOne", String.format("DELETE FROM %1$s", collName), collName);
+      return db.run("delete", String.format("DELETE FROM %1$s", collName), klass);
     }
 
     Map<String, List<String>> filters = generateWhereClause(filter);
@@ -324,29 +327,66 @@ public class Collection<T> {
     }
     List params = populateParams(filters);
 
-    return db.run("queryOne", q, params.toArray(), collName);
+    return db.run("delete", q, params.toArray(), klass);
   }
 
   public String updateFieldById(String id, String field, Object value) {
-    if(id.matches("[\\w_]+")) {
-      Object[] params = {"$." + field, value, id};
-      return db.run("queryOne", "UPDATE "+collName+" SET value = json_set(value, ?, ?) WHERE key = ?", params, collName);
-    }
-    return null;
+    return updateField(id, field, value);
   }
 
   public String updateField(String filter, String field, Object value) {
+    if(filter.matches("[\\w_]+")) {
+      Object[] params = {"$." + field, value, filter};
+      return db.run("update", "UPDATE "+collName+" SET value = json_replace(value, ?, ?) WHERE key = ?", params, klass);
+    }
+
     Map<String, List<String>> filters = generateWhereClause(filter);
-    String query = "UPDATE "+collName+" SET value = json_set(value, ?, ?)" + filters.get("query").get(0);
+    String query = "UPDATE "+collName+" SET value = json_replace(value, ?, ?)" + filters.get("query").get(0);
     List params = populateParams(filters);
     params.add(0, value);
     params.add(0, "$." + field);
 
-    return db.run("queryOne", query, params.toArray(), collName);
+    return db.run("update", query, params.toArray(), klass);
+  }
+
+  public String removeFieldById(String id, String field) {
+    return removeField(id, field);
+  }
+
+  public String removeField(String filter, String field) {
+    if(filter.matches("[\\w_]+")) {
+      Object[] params = {"$." + field, filter};
+      return db.run("update", "UPDATE "+collName+" SET value = json_remove(value, ?) WHERE key = ?", params, klass);
+    }
+
+    Map<String, List<String>> filters = generateWhereClause(filter);
+    String query = "UPDATE "+collName+" SET value = json_remove(value, ?)" + filters.get("query").get(0);
+    List params = populateParams(filters);
+    params.add(0, "$." + field);
+
+    return db.run("update", query, params.toArray(), klass);
+  }
+
+  public String changeFieldById(String id, String newField, String oldField) {
+    return changeField(id, newField, oldField);
+  }
+
+  public String changeField(String filter, String newField, String oldField) {
+    if(filter.matches("[\\w_]+")) {
+      Object[] params = {"$." + newField, "$." + oldField, filter};
+      return db.run("update", "UPDATE "+collName+" SET value = json_remove(value, ?) WHERE key = ?", params, klass);
+    }
+
+    Map<String, List<String>> filters = generateWhereClause(filter);
+    String query = "UPDATE "+collName+" SET value = json_remove(value, ?)" + filters.get("query").get(0);
+    List params = populateParams(filters);
+    params.add(0, "$." + oldField);
+    params.add(0, "$." + newField);
+
+    return db.run("update", query, params.toArray(), klass);
   }
 
   // change field name
-  // remove single field - update User set value = json_remove(value, '$.cat.color')
 
   public int size() {
     try {
@@ -360,11 +400,11 @@ public class Collection<T> {
   }
 
   public void watch(WatchHandler watcher) {
-    db.watch(watcher);
+    db.watch(collName, watcher);
   }
 
   public void watch(String event, WatchHandler watcher) {
-    db.watch(event, watcher);
+    db.watch(collName, event, watcher);
   }
 
   private String JSONstringify(Object value) {
