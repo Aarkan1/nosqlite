@@ -144,15 +144,17 @@ public class Main {
   private static void saveUsers(User[] users, int iter) throws IOException {
     ObjectMapper mapper = new ObjectMapper();
     collection("User").find(10, 0);
-    System.out.println("before saveUsers: " + collection("User").find().size());
+//    System.out.println("before saveUsers: " + collection("User").size());
     long start = System.currentTimeMillis();
     for(int i = 0; i < iter; i++) {
       User[] copy = mapper.readValue(mapper.writeValueAsBytes(users), User[].class);
       for(var u : copy) {
-//      new Thread(() -> {
-        u.getCat().setId(null);
-        collection("Cat").save(u.getCat());
-//      }).start();
+//      for(int j = 0; j < 10; j++) {
+//        User u = copy[j];
+        u.setUid(null);
+        new Thread(() -> {
+          collection("User").save(u);
+        }).start();
       }
 //        collection("User").save(copy);
 
@@ -161,6 +163,6 @@ public class Main {
 //      }).start();
     }
 //    System.out.println("commit users: " + ((System.currentTimeMillis() - start)) + "ms");
-//    System.out.println("after saveUsers: " + collection("User").find().size());
+//    System.out.println("after saveUsers: " + collection("User").size());
   }
 }

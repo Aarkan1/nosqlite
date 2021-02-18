@@ -29,7 +29,7 @@ public class Database {
 
     try {
       conn = DriverManager.getConnection("jdbc:sqlite:db/data.db");
-      dbHelper = new DbHelper(conn);
+      dbHelper = new DbHelper(conn, true, true);
     } catch (SQLException e) {
       e.printStackTrace();
       return;

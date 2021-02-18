@@ -10,10 +10,7 @@ import utilities.Utils;
 
 import java.sql.*;
 import java.util.*;
-import java.util.concurrent.BlockingDeque;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
@@ -23,7 +20,9 @@ class DbHelper {
   private Map<String, List<WatchHandler>> watchers = new HashMap<>();
   private Map<String, Map<String, List<WatchHandler>>> eventWatchers = new HashMap<>();
   private AtomicBoolean isRunning = new AtomicBoolean(true);
+  private boolean runAsync = true;
   private ObjectMapper mapper = new ObjectMapper();
+  ThreadPoolExecutor watchExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(5);
   
   /**
    * Object to queue in the BlockingDeque
@@ -52,51 +51,85 @@ class DbHelper {
    *
    * @param conn The database connection
    */
-  DbHelper(Connection conn) throws SQLException {
+  DbHelper(Connection conn, boolean useRegex, boolean runAsync) throws SQLException {
     this.conn = conn;
-    boolean useRegex = true;
+    this.runAsync = runAsync;
     if (useRegex) addRegex(conn);
     
-    new Thread(() -> {
-      while (isRunning.get() || !tasks.isEmpty()) {
-        try {
-          Task task = tasks.take();
-          
-          if (task.method.equals("queryMany")) {
-            String[] future = {"insert", queryMany(task.query, task.params, task.coll, task.collName)};
-            task.future.complete(future);
-          } else {
-            String[] future = {task.method, query(task.query, task.params, task.collName)};
-            task.future.complete(future);
+    if (runAsync) {
+      new Thread(() -> {
+        while (isRunning.get() || !tasks.isEmpty()) {
+          try {
+            Task task = tasks.take();
+            
+            if (task.method.equals("queryMany")) {
+              String[] future = {"insert", queryMany(task.query, task.params, task.coll, task.collName)};
+              task.future.complete(future);
+            } else {
+              String[] future = {task.method, query(task.query, task.params, task.collName)};
+              task.future.complete(future);
+            }
+          } catch (InterruptedException | SQLException e) {
+            e.printStackTrace();
           }
-        } catch (InterruptedException | SQLException e) {
+        }
+        
+        // stop
+        watchExecutor.shutdown();
+        
+        try {
+          conn.close();
+        } catch (SQLException e) {
           e.printStackTrace();
         }
-      }
-      
-      try {
-        conn.close();
-      } catch (SQLException e) {
-        e.printStackTrace();
-      }
-    }).start();
+      }).start();
+    }
     
     Runtime.getRuntime().addShutdownHook(new Thread(this::close));
   }
   
   void close() {
     isRunning.set(false);
+    
+    if(!runAsync) {
+      try {
+        conn.close();
+      } catch (SQLException e) {
+        e.printStackTrace();
+      }
+    }
   }
   
   <T> String run(String method, String query, Object[] params, Class<T> coll, String collName) {
-    CompletableFuture<String[]> future = new CompletableFuture<>();
-    tasks.add(new Task(method, query, params, coll, collName, future));
-    try {
-      if (!query.startsWith("CREATE")) {
-        String[] get = future.get();
-        // get[0] == event
-        // get[1] == document
-        
+    String[] get = new String[2];
+    // get[0] == event
+    // get[1] == document
+    
+    if (runAsync) {
+      CompletableFuture<String[]> future = new CompletableFuture<>();
+      tasks.add(new Task(method, query, params, coll, collName, future));
+      try {
+        get = future.get();
+      } catch (InterruptedException | ExecutionException e) {
+        e.printStackTrace();
+      }
+    } else {
+      try {
+        if (method.equals("queryMany")) {
+          get[0] = "insert";
+          get[1] = queryMany(query, params, coll, collName);
+        } else {
+          get[0] = method;
+          get[1] = query(query, params, collName);
+        }
+      } catch (SQLException e) {
+        e.printStackTrace();
+      }
+    }
+    
+    if (!query.startsWith("CREATE")) {
+      
+      try {
         // don't bother converting json if there's no watchers
         if (!method.equals("none") && !get[1].endsWith("all") && (eventWatchers.get(collName) != null || watchers.get(collName) != null)) {
           updateWatchers(collName, get[0], new WatchData(collName, get[0],
@@ -105,9 +138,9 @@ class DbHelper {
         }
         
         return get[1];
+      } catch (JsonProcessingException e) {
+        e.printStackTrace();
       }
-    } catch (InterruptedException | ExecutionException | JsonProcessingException e) {
-      e.printStackTrace();
     }
     return null;
   }
@@ -236,9 +269,14 @@ class DbHelper {
     if (event.equals("none")) return;
     
     if (eventWatchers.get(collName) != null && eventWatchers.get(collName).get(event) != null) {
-      eventWatchers.get(collName).get(event).forEach(w -> w.handle(watchData));
+      if (runAsync)
+        watchExecutor.submit(() -> eventWatchers.get(collName).get(event).forEach(w -> w.handle(watchData)));
+      else eventWatchers.get(collName).get(event).forEach(w -> w.handle(watchData));
     }
-    if (watchers.get(collName) != null) watchers.get(collName).forEach(w -> w.handle(watchData));
+    if (watchers.get(collName) != null) {
+      if (runAsync) watchExecutor.submit(() -> watchers.get(collName).forEach(w -> w.handle(watchData)));
+      else watchers.get(collName).forEach(w -> w.handle(watchData));
+    }
   }
   
   private void addRegex(Connection conn) throws SQLException {
