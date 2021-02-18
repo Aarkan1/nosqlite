@@ -1,6 +1,7 @@
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import entities.Cat;
+import entities.Race;
 import entities.User;
 
 import java.io.File;
@@ -13,30 +14,35 @@ import static utilities.Filter.*;
 public class Main {
   public static void main(String[] args) throws IOException {
 //    var db = new Database();
-
-//    collection("map").putIfAbsent("name", "Tea");
-//    collection("map").put("name", "Aarkan");
-//    collection("map").put("age", 22);
+  
+//    System.out.println(collection("map").putIfAbsent("name", "Tea"));
+//    System.out.println(collection("map").putIfAbsent("username", "Tea"));
+//    System.out.println(collection("map").get("name"));
+//    System.out.println(collection("map").put("name", "Loke"));
+//    System.out.println(collection("map").put("age", 33));
+//    System.out.println(collection("map").remove("username"));
+    
 //    collection("map").put("saldo", 123.45);
 //    collection("map").put("dude", new User("Dude", "hej_hopp"));
 //    System.out.println(collection("map").remove("saldo"));
 
 //    System.out.println(collection("map").get("name"));
 //    System.out.println(collection("map").get("saldo"));
-//    System.out.println(collection("map").get("dude"));
+//    System.out.println(collection("map").get("dude", User.class));
 
-    collection("User").watch("insert", watchData -> {
-      System.out.println("[insert] User: " + watchData.data);
-    });
-    collection("User").watch("update", watchData -> {
-      System.out.println("[update] User: " + watchData.data);
-    });
-    collection("User").watch("delete", watchData -> {
-      System.out.println("[delete] User: " + watchData.data);
-    });
-    collection("Cat").watch("update", watchData -> {
-      System.out.println("[update] Cat: " + watchData.data);
-    });
+
+//    collection("User").watch("insert", watchData -> {
+//      System.out.println("[insert] User: " + watchData.data);
+//    });
+//    collection("User").watch("update", watchData -> {
+//      System.out.println("[update] User: " + watchData.data);
+//    });
+//    collection("User").watch("delete", watchData -> {
+//      System.out.println("[delete] User: " + watchData.data);
+//    });
+//    collection("Cat").watch("update", watchData -> {
+//      System.out.println("[update] Cat: " + watchData.data);
+//    });
 
 
     long start = System.currentTimeMillis();
@@ -55,12 +61,17 @@ public class Main {
 
     var user = new User("arn", "abc123");
     var cat = new Cat("Bamse", "Pink");
+    cat.setRace(new Race("Dog", 50));
     user.setCat(cat);
 
 //    collection("Cat").save(cat);
+    start = System.currentTimeMillis();
     collection("User").save(user);
-//    System.out.println(collection("User").save(user));
-    System.out.println("deleted user: " + collection("User").delete(user));
+    System.out.println("save user: " + ((System.currentTimeMillis() - start)) + "ms");
+
+    start = System.currentTimeMillis();
+    collection("User").delete(user);
+    System.out.println("deleted user: " + ((System.currentTimeMillis() - start)) + "ms");
 
     start = System.currentTimeMillis();
     collection("User").updateFieldById("BcooRXpbRJnvfB91IViXk", "username", "Aarkan");
@@ -82,6 +93,7 @@ public class Main {
 //    collection("User").delete();
 //      saveUsers(importedUsers, 1);
 //    System.out.println("saved 1'000 users: " + ((System.currentTimeMillis() - start)) + "ms");
+    int size = 100;
 
     start = System.currentTimeMillis();
     collection("User").find(
@@ -92,16 +104,10 @@ public class Main {
                 eq("cat.race.type", "Houma")
             ),
             not("cat.race.type", "Houma")
-        ), 20);
+        ), size, 0);
 //    System.out.println(collection("User").find("username=Aarkan&&cat.color=blue", 1));
-    System.out.println("find with deep search: " + ((System.currentTimeMillis() - start)) + "ms");
+    System.out.println("find "+size+" with deep search: " + ((System.currentTimeMillis() - start)) + "ms");
 
-//    System.out.println(regex("cat.name", "^Bad[a-z]*"));
-
-//    System.out.println(in("cat.age", 2,5));
-//    System.out.println(in("cat.age", values));
-
-    int size = 1000;
     start = System.currentTimeMillis();
     collection("User").find(size, 0);
     System.out.println("find "+size+" users: " + ((System.currentTimeMillis() - start)) + "ms");
@@ -111,21 +117,28 @@ public class Main {
     System.out.println("findAsJson "+size+" users: " + ((System.currentTimeMillis() - start)) + "ms");
 
     start = System.currentTimeMillis();
-    collection("User").find("username~~^Sa", null, 10, 0);
-    System.out.println("find with regex: " + ((System.currentTimeMillis() - start)) + "ms");
+    collection("User").find("username~~^Sa", null, size, 0);
+    System.out.println("find "+size+" with regex: " + ((System.currentTimeMillis() - start)) + "ms");
+    
+//    collection("User").createIndex("cat.username");
 
 //    TODO: sort is slow on large datasets
-//    start = System.currentTimeMillis();
-//    System.out.println(collection("User").find(op -> {
-//      op.filter = "username=~ma";
-//      op.sort = "cat.age<";
-//      op.limit = 10;
-//    }).size());
-//    System.out.println("find with sort: " + ((System.currentTimeMillis() - start)) + "ms");
+    start = System.currentTimeMillis();
+    collection("User").find(op -> {
+      op.filter = "username=~ma";
+      op.sort = "cat.age<";
+      op.limit = size;
+    });
+    System.out.println("find "+size+" with sort: " + ((System.currentTimeMillis() - start)) + "ms");
 
-    System.out.println("num of cats: " + collection("Cat").size());
-    collection("Cat").updateFieldById("6YKGSNmc91sLOeG4XAC0b", "age", 10);
-    System.out.println(collection("Cat").findByIdAsJson("6YKGSNmc91sLOeG4XAC0b"));
+//    System.out.println("num of cats: " + collection("Cat").size());
+//    collection("Cat").updateFieldById("6YKGSNmc91sLOeG4XAC0b", "age", 10);
+//    start = System.currentTimeMillis();
+//    collection("Cat").changeFieldName("race.time", "race.weight");
+//    collection("Cat").removeField("race.weight");
+//    collection("Cat").updateField("race.weight", 50);
+//    System.out.println("update all: " + ((System.currentTimeMillis() - start)) + "ms");
+//    System.out.println(collection("Cat").findByIdAsJson("6YKGSNmc91sLOeG4XAC0b"));
   }
 
   private static void saveUsers(User[] users, int iter) throws IOException {

@@ -4,7 +4,7 @@ import database.annotations.Id;
 import database.annotations.Document;
 import entities.Cat;
 
-@Document()
+@Document
 public class User {
 
   @Id

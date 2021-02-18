@@ -10,7 +10,12 @@ public class Race {
   public Race(String type) {
     this.type = type;
   }
-
+  
+  public Race(String type, int time) {
+    this.type = type;
+    this.time = time;
+  }
+  
   public int getTime() {
     return time;
   }
