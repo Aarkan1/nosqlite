@@ -20,7 +20,7 @@ class DbHelper {
   private Map<String, List<WatchHandler>> watchers = new HashMap<>();
   private Map<String, Map<String, List<WatchHandler>>> eventWatchers = new HashMap<>();
   private AtomicBoolean isRunning = new AtomicBoolean(true);
-  private boolean runAsync = true;
+  private boolean runAsync;
   private ObjectMapper mapper = new ObjectMapper();
   ThreadPoolExecutor watchExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(5);
   
@@ -74,7 +74,7 @@ class DbHelper {
           }
         }
         
-        // stop
+        // stop watch handlers
         watchExecutor.shutdown();
         
         try {
@@ -91,7 +91,7 @@ class DbHelper {
   void close() {
     isRunning.set(false);
     
-    if(!runAsync) {
+    if (!runAsync) {
       try {
         conn.close();
       } catch (SQLException e) {
@@ -128,10 +128,12 @@ class DbHelper {
     }
     
     if (!query.startsWith("CREATE")) {
-      
       try {
         // don't bother converting json if there's no watchers
-        if (!method.equals("none") && !get[1].endsWith("all") && (eventWatchers.get(collName) != null || watchers.get(collName) != null)) {
+        if (!method.equals("none")
+            && get[1] != null
+            && !get[1].endsWith("all")
+            && (eventWatchers.get(collName) != null || watchers.get(collName) != null)) {
           updateWatchers(collName, get[0], new WatchData(collName, get[0],
               mapper.readValue("[" + get[1] + "]",
                   mapper.getTypeFactory().constructCollectionType(List.class, coll))));
@@ -208,9 +210,9 @@ class DbHelper {
       return rs.getString(1);
     } catch (SQLException e) {
       // no document found
-      if (!e.getMessage().equals("ResultSet closed")) {
+      if (e.getMessage().equals("ResultSet closed")) {
         // TODO: Print useful message for bad search query
-        
+      } else {
         e.printStackTrace(); // debug
       }
     }

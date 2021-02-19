@@ -28,15 +28,15 @@ public class Main {
 
 //    System.out.println(collection("map").get("name"));
 //    System.out.println(collection("map").get("saldo"));
-//    System.out.println(collection("map").get("dude", User.class));
+//    System.out.println(collection("map").get("dude"));
 
 
-//    collection("User").watch("insert", watchData -> {
-//      System.out.println("[insert] User: " + watchData.data);
-//    });
-//    collection("User").watch("update", watchData -> {
-//      System.out.println("[update] User: " + watchData.data);
-//    });
+    collection("User").watch("insert", watchData -> {
+      System.out.println("[insert] User: " + watchData.data);
+    });
+    collection("User").watch("update", watchData -> {
+      System.out.println("[update] User: " + watchData.data);
+    });
 //    collection("User").watch("delete", watchData -> {
 //      System.out.println("[delete] User: " + watchData.data);
 //    });
@@ -63,18 +63,23 @@ public class Main {
     var cat = new Cat("Bamse", "Pink");
     cat.setRace(new Race("Dog", 50));
     user.setCat(cat);
-
+    
+    ObjectMapper mapper = new ObjectMapper();
+    user.setUid("abc123");
+    user.setUsername("Loke");
+  
 //    collection("Cat").save(cat);
     start = System.currentTimeMillis();
+//    collection("User").save(mapper.writeValueAsString(user));
     collection("User").save(user);
     System.out.println("save user: " + ((System.currentTimeMillis() - start)) + "ms");
 
-    start = System.currentTimeMillis();
-    collection("User").delete(user);
-    System.out.println("deleted user: " + ((System.currentTimeMillis() - start)) + "ms");
+//    start = System.currentTimeMillis();
+//    collection("User").delete(user);
+//    System.out.println("deleted user: " + ((System.currentTimeMillis() - start)) + "ms");
 
     start = System.currentTimeMillis();
-    collection("User").updateFieldById("BcooRXpbRJnvfB91IViXk", "username", "Aarkan");
+    collection("User").updateFieldById("BcooRXpbRJnvfB91IViXk", "username", "Loke");
     System.out.println("update field by id: " + ((System.currentTimeMillis() - start)) + "ms");
 
 //    TODO: filter update is MUCH slower on large datasets

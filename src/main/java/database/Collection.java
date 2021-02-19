@@ -75,7 +75,7 @@ public class Collection<T> {
   
   public String get(String key) {
     if (key == null) throw new NullPointerException();
-    String query = String.format("SELECT value FROM %1$s WHERE key = ?", collName);
+    String query = "SELECT value FROM " + collName + " WHERE key = ?";
     Object[] params = {key};
     return db.get(query, params);
   }
@@ -91,7 +91,7 @@ public class Collection<T> {
   
   public String putIfAbsent(String key, Object value) {
     boolean exists = get(key) != null;
-    if(exists) return '\'' + key + "' already exists";
+    if (exists) return '\'' + key + "' already exists";
     
     String json = JSONstringify(value);
     String query = String.format("INSERT INTO %s values(?, json(?))", collName);
@@ -107,16 +107,26 @@ public class Collection<T> {
   
   public String save(String json) {
     if (json == null) throw new NullPointerException();
-    Map<String, String> field = getIdField();
+    Object[] jsonParams = {json, "$." + idField};
+    String jsonId = db.get("SELECT json_extract(json(?), ?)", jsonParams);
+    
+    if (jsonId == null) {
+      Map<String, String> field = getIdField();
+      jsonId = field.get("id");
+    }
+    String exists = get(jsonId);
+    if(json.equals(exists)) return json; // don't update document which have no changes
+    
     String query = String.format("INSERT INTO %s VALUES(?, json(json_set(?, '$.%s', ?))) " +
-        "ON CONFLICT(key) DO UPDATE SET value=json(excluded.value)", collName, field.get("name"));
-    Object[] params = {field.get("id"), json, field.get("id")};
-    return db.run("insert", query, params, klass, collName);
+        "ON CONFLICT(key) DO UPDATE SET value=json(excluded.value)", collName, idField);
+    
+    Object[] params = {jsonId, json, jsonId};
+    return db.run(exists != null ? "update" : "insert", query, params, klass, collName);
   }
   
   public T save(Object document) {
     if (document == null) throw new NullPointerException();
-  
+    
     if (document.getClass() != klass) try {
       throw new TypeMismatchException(String.format("'%s' cannot be saved in a '%s' collection", document.getClass().getSimpleName(), collName));
     } catch (TypeMismatchException e) {
@@ -126,10 +136,13 @@ public class Collection<T> {
     
     Map<String, String> field = getIdField(document);
     String json = JSONstringify(document);
+    String exists = get(field.get("id"));
+    if(json.equals(exists)) return (T) document; // don't update document which have no changes
+  
     String query = String.format("INSERT INTO %s VALUES(?, json(?)) " +
         "ON CONFLICT(key) DO UPDATE SET value=json(excluded.value)", collName);
     Object[] params = {field.get("id"), json};
-    db.run("insert", query, params, klass, collName);
+    db.run(exists != null ? "update" : "insert", query, params, klass, collName);
     return (T) document;
   }
   
@@ -157,7 +170,7 @@ public class Collection<T> {
   }
   
   public List<T> find() {
-    return find(null, null,0, 0);
+    return find(null, null, 0, 0);
   }
   
   public List<T> find(int limit, int offset) {
@@ -220,7 +233,7 @@ public class Collection<T> {
   }
   
   public String findOneAsJson(String filter) {
-    return findOneAsJson(filter, null,1, 0);
+    return findOneAsJson(filter, null, 1, 0);
   }
   
   private String findOneAsJson(String filter, String sort, int limit, int offset) {
@@ -228,7 +241,7 @@ public class Collection<T> {
       return db.get(String.format("SELECT GROUP_CONCAT(value) FROM (SELECT value FROM %1$s" +
           (limit == 0 ? ")" : " LIMIT %2$d OFFSET %3$d)"), collName, limit, offset));
     }
-  
+    
     // TODO: sort is slow on large datasets
     String orderBy = "";
     String[] order = new String[2];
@@ -335,6 +348,12 @@ public class Collection<T> {
   public String updateField(String filter, String field, Object value) {
     if (field == null) throw new NullPointerException();
   
+    if (filter != null) {
+      Object[] params = {"$." + field, filter};
+      String oldValue = db.get("SELECT json_extract(value, ?) FROM " + collName + " WHERE key = ?", params);
+      if(oldValue.equals(value)) return "same value"; // don't update same value
+    }
+    
     if (filter != null && filter.matches("[\\w_]+")) {
       Object[] params = {"$." + field, value, filter};
       return db.run("update", "UPDATE " + collName + " SET value = json_replace(value, ?, ?) WHERE key = ?", params, klass, collName);
@@ -365,7 +384,7 @@ public class Collection<T> {
     String fieldTaken = db.get("SELECT json_extract(value, ?) FROM " + collName + " LIMIT 1", params1);
     
     // field name exists
-    if(fieldTaken != null) {
+    if (fieldTaken != null) {
       // throw error?
       System.err.printf("Field '%s' is already in use in document '%s'\n", newField, collName);
       return null;
