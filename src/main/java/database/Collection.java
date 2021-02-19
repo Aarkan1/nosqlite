@@ -262,7 +262,7 @@ public class Collection<T> {
     Map<String, List<String>> filters = generateWhereClause(filter);
     String q = String.format("SELECT GROUP_CONCAT(value) FROM (SELECT value FROM %1$s"
         + filters.get("query").get(0) + orderBy + (limit == 0 ? ")" : " LIMIT %2$d OFFSET %3$d)"), collName, limit, offset);
-    
+  
     List params = populateParams(filters);
     if (sort != null) params.add(order[0]);
     
@@ -484,7 +484,7 @@ public class Collection<T> {
     List<String> paths = new ArrayList<>();
     List<String> values = new ArrayList<>();
     boolean useRegex = true;
-    String regex = useRegex ? "([\\w\\.\\[\\]]+)(~~|=~|==|>=|<=|!=|<|>|=)([%\\-,\\^_\\w\\.\\[\\]\\(\\)\\?\\>\\<\\:\\=\\{\\}\\+\\*\\$]+)(&&|\\|\\|)?"
+    String regex = useRegex ? "([\\w\\.\\[\\]]+)(~~|=~|==|>=|<=|!=|<|>|=)([%\\-,\\^_\\w\\.\\[\\]\\(\\)\\?\\>\\<\\:\\=\\{\\}\\+\\*\\$\\\\\\/]+\\|{0,1}[%\\-,\\^_\\w\\.\\[\\]\\(\\)\\?\\>\\<\\:\\=\\{\\}\\+\\*\\$\\\\\\/]*(?<!\\|))(&&|\\|\\|)?"
         : "([\\w\\.\\[\\]]+)(=~|==|>=|<=|!=|<|>|=)([%\\-,\\_\\w\\.\\[\\]!?]+)(&&|\\|\\|)?";
     String query = " WHERE" + new Rewriter(regex) {
       public String replacement() {

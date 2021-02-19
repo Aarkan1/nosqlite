@@ -99,7 +99,7 @@ public class Main {
 //      saveUsers(importedUsers, 1);
 //    System.out.println("saved 1'000 users: " + ((System.currentTimeMillis() - start)) + "ms");
     int size = 100;
-
+  
     start = System.currentTimeMillis();
     collection("User").find(
         and(
