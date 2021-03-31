@@ -1,13 +1,14 @@
 package utilities;
 
 import java.util.Arrays;
+import java.util.List;
 
 public abstract class Filter {
   public static String eq(String field, Object value) {
     return field + "=" + value;
   }
 
-  public static String not(String field, Object value) {
+  public static String ne(String field, Object value) {
     return field + "!=" + value;
   }
 
@@ -32,9 +33,14 @@ public abstract class Filter {
   }
 
   public static String regex(String field, String regex) { return field + "~~" + regex; }
+  
+  public static String not(String value) { return "!(" + value + ")"; }
 
   public static String in(String field, Object... values) {
-    return field + "==" + Arrays.asList(values) ;
+    if(values[0] instanceof List) {
+      return field + "==" + values[0];
+    }
+    return field + "==" + Arrays.asList(values);
   }
 
   public static String and(String... filters) {

@@ -15,4 +15,13 @@ public class WatchData<T> {
     this.event = event;
     this.data = data;
   }
+  
+  @Override
+  public String toString() {
+    return "WatchData {" +
+        "\n  entity='" + entity + '\'' +
+        "\n  event='" + event + '\'' +
+        "\n  data=" + data +
+        "\n}";
+  }
 }

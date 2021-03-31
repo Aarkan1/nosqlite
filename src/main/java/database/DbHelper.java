@@ -1,11 +1,11 @@
 package database;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import database.handlers.WatchData;
 import database.handlers.WatchHandler;
 import org.sqlite.Function;
+import utilities.Rewriter;
 import utilities.Utils;
 
 import java.sql.*;
@@ -14,14 +14,15 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
+@SuppressWarnings("unchecked")
 class DbHelper {
   Connection conn;
-  private BlockingDeque<Task> tasks = new LinkedBlockingDeque<>();
-  private Map<String, List<WatchHandler>> watchers = new HashMap<>();
-  private Map<String, Map<String, List<WatchHandler>>> eventWatchers = new HashMap<>();
+  private final BlockingDeque<Task> tasks = new LinkedBlockingDeque<>();
+  private final Map<String, List<WatchHandler>> watchers = new HashMap<>();
+  private final Map<String, Map<String, List<WatchHandler>>> eventWatchers = new HashMap<>();
   private AtomicBoolean isRunning = new AtomicBoolean(true);
   private boolean runAsync;
-  private ObjectMapper mapper = new ObjectMapper();
+  private final ObjectMapper mapper = new ObjectMapper();
   ThreadPoolExecutor watchExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(5);
   
   /**
@@ -132,17 +133,19 @@ class DbHelper {
         // don't bother converting json if there's no watchers
         if (!method.equals("none")
             && get[1] != null
+            && !get[1].equals("deleted")
             && !get[1].endsWith("all")
             && (eventWatchers.get(collName) != null || watchers.get(collName) != null)) {
+          
+          // must be a json array for watchers
+          if(!get[1].startsWith("[")) get[1] = "[" + get[1] + "]";
           updateWatchers(collName, get[0], new WatchData(collName, get[0],
-              mapper.readValue("[" + get[1] + "]",
+              mapper.readValue(get[1],
                   mapper.getTypeFactory().constructCollectionType(List.class, coll))));
         }
         
         return get[1];
-      } catch (JsonProcessingException e) {
-        e.printStackTrace();
-      }
+      } catch (JsonProcessingException ignore) { }
     }
     return null;
   }
@@ -161,15 +164,8 @@ class DbHelper {
     
     // fetch doc before delete
     if (query.startsWith("DELETE")) {
-      String doc;
-      if (params == null) {
-        doc = "deleted all";
-      } else {
-        Object[] id = {params[0]};
-        doc = get("SELECT value FROM " + collName + " WHERE key = ?", id);
-      }
       stmt.executeUpdate();
-      return doc;
+      return "deleted";
     }
     
     stmt.executeUpdate();
@@ -206,6 +202,8 @@ class DbHelper {
           Utils.setParams(i + 1, params[i], stmt);
         }
       }
+//      System.out.println(stmt.toString()); // debug
+      
       ResultSet rs = stmt.executeQuery();
       return rs.getString(1);
     } catch (SQLException e) {
@@ -256,6 +254,88 @@ class DbHelper {
     return null;
   }
   
+  private String findAsJson(String collName, String filter, Object[] params, int limit) {
+    Map<String, List<String>> filters = generateWhereClause(filter);
+    String q = String.format("SELECT GROUP_CONCAT(value) FROM (SELECT value FROM %1$s"
+        + filters.get("query").get(0) + (limit == 0 ? ")" : " LIMIT %2$d)"), collName, limit);
+  
+    return get(q, params);
+  }
+  
+  String findAsJson(String collName, String filter, String sort, int limit, int offset) {
+    if (filter == null) {
+      return get(String.format("SELECT GROUP_CONCAT(value) FROM (SELECT value FROM %1$s" +
+          (limit == 0 ? ")" : " LIMIT %2$d OFFSET %3$d)"), collName, limit, offset));
+    }
+    
+    // TODO: sort is slow on large datasets
+    String orderBy = "";
+    String[] order = new String[2];
+    if (sort != null) {
+      if (sort.endsWith("<")) {
+        order[0] = "$." + sort.substring(0, sort.length() - 1);
+        order[1] = "ASC";
+      } else if (sort.endsWith(">")) {
+        order[0] = "$." + sort.substring(0, sort.length() - 1);
+        order[1] = "DESC";
+      } else {
+        order = sort.split("=|==");
+        order[0] = "$." + order[0];
+      }
+      orderBy = " ORDER BY json_extract(value, ?) " + order[1];
+    }
+    
+    Map<String, List<String>> filters = generateWhereClause(filter);
+    String q = String.format("SELECT GROUP_CONCAT(value) FROM (SELECT value FROM %1$s"
+        + filters.get("query").get(0) + orderBy + (limit == 0 ? ")" : " LIMIT %2$d OFFSET %3$d)"), collName, limit, offset);
+    
+    List params = populateParams(filters);
+    if (sort != null) params.add(order[0]);
+    
+    return get(q, params.toArray());
+  }
+  
+  String deleteDocs(String collName, String filter, int limit, Class klass) {
+    if (filter == null) {
+      return run("delete", String.format("DELETE FROM %1$s", collName), klass, collName);
+    }
+    
+    Map<String, List<String>> filters = generateWhereClause(filter);
+    String q;
+    if (limit == 0) {
+      q = String.format("DELETE FROM %1$s" + filters.get("query").get(0), collName);
+    } else {
+      q = String.format("DELETE FROM %1$s WHERE %1$s.key = (SELECT %1$s.key FROM %1$s"
+          + filters.get("query").get(0) + " LIMIT %2$d)", collName, limit);
+    }
+    List params = populateParams(filters);
+    
+    String deletedDocs;
+    String deleted;
+    if(filter.startsWith("key=")) {
+      Object[] param = { params.get(1) };
+      deletedDocs = get("SELECT value FROM " + collName + " WHERE key = ?", param);
+      deleted = run("delete", "DELETE FROM " + collName + " WHERE key = ?", param, klass, collName);
+    } else {
+      deletedDocs = findAsJson(collName, filter, params.toArray(), limit);
+      deleted = run("delete", q, params.toArray(), klass, collName);
+    }
+    deletedDocs = "[" + deletedDocs +"]";
+  
+    if (deleted.equals("deleted")) try {
+      // don't bother converting json if there's no watchers
+      if (eventWatchers.get(collName) != null || watchers.get(collName) != null) {
+        updateWatchers(collName, "delete", new WatchData(collName, "delete",
+            mapper.readValue(deletedDocs, mapper.getTypeFactory().constructCollectionType(List.class, klass))));
+      }
+      return deletedDocs;
+    } catch (JsonProcessingException e) {
+      e.printStackTrace();
+    }
+    
+    return null;
+  }
+  
   void watch(String collName, WatchHandler watcher) {
     watchers.putIfAbsent(collName, new ArrayList<>());
     watchers.get(collName).add(watcher);
@@ -296,4 +376,119 @@ class DbHelper {
       }
     });
   }
+  
+  List populateParams(Map<String, List<String>> filters) {
+    List params = new ArrayList();
+    
+    for (int i = 0; i < filters.get("paths").size(); i++) {
+      params.add(filters.get("paths").get(i));
+      String[] inValues = {filters.get("values").get(i)};
+      
+      if (inValues[0].startsWith("[") && inValues[0].endsWith("]")) {
+        inValues[0] = inValues[0].replaceAll("^\\[", "").replaceAll("]$", "");
+        inValues = inValues[0].split(",");
+      }
+      
+      for (String value : inValues) {
+        if (Utils.isNumeric(value)) {
+          if (value.contains(".")) { // with decimals
+            try {
+              params.add(Double.parseDouble(value));
+            } catch (Exception tryFloat) {
+              try {
+                params.add(Float.parseFloat(value));
+              } catch (Exception e) {
+                e.printStackTrace();
+              }
+            }
+          } else { // without decimals
+            try {
+              params.add(Integer.parseInt(value));
+            } catch (Exception tryLong) {
+              try {
+                params.add(Long.parseLong(value));
+              } catch (Exception e) {
+                e.printStackTrace();
+              }
+            }
+          }
+        } else { // not a number
+          params.add(value);
+        }
+      }
+    }
+    return params;
+  }
+  
+  Map<String, List<String>> generateWhereClause(String filter) {
+    List<String> paths = new ArrayList<>();
+    List<String> values = new ArrayList<>();
+    boolean useRegex = true;
+    
+    String regex = useRegex ? "(\\s*\\!\\s*)?([\\(\\w\\s\\.\\[\\]]+)\\s*(~~|=~|==|>=|<=|!=|<|>|=)\\s*([%\\-,\\^_\\w\\.\\[\\]\\(\\)\\?\\>\\<\\:\\=\\{\\}\\+\\*\\$\\\\\\/]+\\|{0,1}[%\\-,\\^_\\w\\s\\.\\[\\]\\(\\)\\?\\>\\<\\:\\=\\{\\}\\+\\*\\$\\\\\\/]*(?<!\\|))\\)?(&&|\\|\\|)?"
+        : "(\\s*\\!\\s*)?([\\(\\w\\s\\.\\[\\]]+)\\s*(=~|==|>=|<=|!=|<|>|=)\\s*([%\\-,\\_\\w\\s\\.\\[\\]!?]+)\\)?(&&|\\|\\|)?";
+    
+    String query = " WHERE" + new Rewriter(regex) {
+      public String replacement() {
+        
+        String path = group(2).replace(" ", "");
+        String startParam =  "";
+        if(group(1) != null && group(1).trim().equals("!")) {
+          startParam = " NOT ";
+        }
+        if(path.startsWith("(")) {
+          startParam += "(";
+          path = path.replaceAll("^\\(", "");
+        }
+        
+        paths.add("$." + path);
+        String val = group(4).trim();
+        String comparator;
+        
+        if ((group(3).equals("==") || group(3).equals("="))
+            && (val.startsWith("[") && val.endsWith("]"))) {
+          
+          val = val.replace(" ", "");
+          
+          String[] inValues = val.split(",");
+          comparator = " IN (";
+          
+          for (String in : inValues) {
+            comparator += "?,";
+          }
+          values.add(val);
+          comparator = comparator.replaceAll(",$", ")");
+        } else {
+          comparator = group(3) + " ?";
+        }
+        if (group(3).equals("=~")) {
+          comparator = "LIKE ?";
+          if (val.contains("%") || val.contains("_")) {
+            values.add(val);
+          } else {
+            values.add("%" + val + "%");
+          }
+        } else if (useRegex && group(3).equals("~~")) {
+          comparator = "REGEXP ?";
+          values.add(val);
+        } else {
+          if (useRegex && val.endsWith(")")) {
+            comparator += ")";
+            val = val.replaceAll("\\s*\\)$", "");
+          }
+          values.add(val);
+        }
+        String andOr = group(5) == null ? "" : (group(5).equals("&&") ? "AND" : "OR");
+        return String.format(startParam + " json_extract(value, ?) %s %s", comparator, andOr);
+      }
+    }.rewrite(filter);
+    
+    Map<String, List<String>> map = new HashMap<>();
+    map.put("query", Collections.singletonList(query));
+    map.put("paths", paths);
+    map.put("values", values);
+    
+    return map;
+  }
+  
 }

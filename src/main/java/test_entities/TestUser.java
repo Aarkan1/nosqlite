@@ -1,11 +1,10 @@
-package entities;
+package test_entities;
 
 import database.annotations.Id;
 import database.annotations.Document;
-import entities.Cat;
 
 @Document
-public class User {
+public class TestUser {
 
   @Id
   private String uid;
@@ -13,16 +12,28 @@ public class User {
   private String password;
   private int age;
 
-  private Cat cat;
+  private TestCat testCat;
 
-  public User() {
+  public TestUser() {
   }
 
-  public User(String username, String password) {
+  public TestUser(String username, String password) {
     this.username = username;
     this.password = password;
   }
-
+  
+  public TestUser(String username, int age) {
+    this.username = username;
+    this.age = age;
+  }
+  
+  public TestUser(String username, String password, int age, TestCat testCat) {
+    this.username = username;
+    this.password = password;
+    this.age = age;
+    this.testCat = testCat;
+  }
+  
   public int getAge() {
     return age;
   }
@@ -31,12 +42,12 @@ public class User {
     this.age = age;
   }
 
-  public Cat getCat() {
-    return cat;
+  public TestCat getTestCat() {
+    return testCat;
   }
 
-  public void setCat(Cat cat) {
-    this.cat = cat;
+  public void setTestCat(TestCat testCat) {
+    this.testCat = testCat;
   }
 
   public String getUid() {
@@ -62,14 +73,15 @@ public class User {
   public void setPassword(String password) {
     this.password = password;
   }
-
+  
   @Override
   public String toString() {
-    return "\nUser{" +
-            "uid=" + uid +
-            ", username='" + username + '\'' +
-            ", password='" + password + '\'' +
-            ", cat='" + cat + '\'' +
-            '}';
+    return "\nTestUser{" +
+        "uid='" + uid + '\'' +
+        ", username='" + username + '\'' +
+        ", password='" + password + '\'' +
+        ", age=" + age +
+        ", testCat=" + testCat +
+        '}';
   }
 }

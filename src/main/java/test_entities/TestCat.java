@@ -1,10 +1,10 @@
-package entities;
+package test_entities;
 
 import database.annotations.Document;
 import database.annotations.Id;
 
 @Document
-public class Cat {
+public class TestCat {
 
   @Id
   private String id;
@@ -13,21 +13,28 @@ public class Cat {
   private String owner;
   private int age;
 
-  private Race race;
+  private TestRace testRace;
 
-  public Cat() {}
+  public TestCat() {}
 
-  public Cat(String name, String color) {
+  public TestCat(String name, String color) {
     this.name = name;
     this.color = color;
   }
 
-  public Cat(String name, String color, Race race) {
+  public TestCat(String name, String color, TestRace testRace) {
     this.name = name;
     this.color = color;
-    this.race = race;
+    this.testRace = testRace;
   }
-
+  
+  public TestCat(String name, String color, int age, TestRace testRace) {
+    this.name = name;
+    this.color = color;
+    this.age = age;
+    this.testRace = testRace;
+  }
+  
   public int getAge() {
     return age;
   }
@@ -36,12 +43,12 @@ public class Cat {
     this.age = age;
   }
 
-  public Race getRace() {
-    return race;
+  public TestRace getTestRace() {
+    return testRace;
   }
 
-  public void setRace(Race race) {
-    this.race = race;
+  public void setTestRace(TestRace testRace) {
+    this.testRace = testRace;
   }
 
   public String getOwner() {
@@ -83,7 +90,7 @@ public class Cat {
             ", name='" + name + '\'' +
             ", color='" + color + '\'' +
             ", age='" + age + '\'' +
-            ", race='" + race + '\'' +
+            ", testRace='" + testRace + '\'' +
             '}';
   }
 }

@@ -1,17 +1,17 @@
-package entities;
+package test_entities;
 
-public class Race {
+public class TestRace {
   private String type;
   private int time;
 
-  public Race() {
+  public TestRace() {
   }
 
-  public Race(String type) {
+  public TestRace(String type) {
     this.type = type;
   }
   
-  public Race(String type, int time) {
+  public TestRace(String type, int time) {
     this.type = type;
     this.time = time;
   }

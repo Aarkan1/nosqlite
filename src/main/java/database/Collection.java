@@ -8,21 +8,20 @@ import database.annotations.Id;
 import database.exceptions.IdAnnotationMissingException;
 import database.exceptions.TypeMismatchException;
 import database.handlers.*;
-import utilities.Rewriter;
-import utilities.Utils;
 
 import java.lang.reflect.Field;
 import java.sql.*;
 import java.util.*;
 
-public class Collection<T> {
-  private Class<T> klass;
+@SuppressWarnings("unchecked")
+public class Collection {
+  private Class klass;
   private String collName;
   private DbHelper db;
   private ObjectMapper mapper = new ObjectMapper();
   private String idField;
   
-  Collection(DbHelper db, Class<T> klass, String collName) {
+  Collection(DbHelper db, Class klass, String collName) {
     this.klass = klass;
     this.db = db;
     this.collName = collName;
@@ -45,29 +44,28 @@ public class Collection<T> {
     // ignore failure on field name mismatch
     mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-//      conn.createStatement().execute("drop table if exists " + klassName);
+    // create table for this document
     db.run("create", "CREATE TABLE IF NOT EXISTS " + collName +
         "(key TEXT PRIMARY KEY UNIQUE NOT NULL, " +
         "value JSON NOT NULL)", klass, collName);
-    
-    // index id field
-    if (idField != null) {
-      createIndex(idField);
-    }
   }
   
   public Connection conn() {
     return db.conn;
   }
   
-  // TODO: doesn't seem to do anything
-  public void createIndex(String field) {
-    if (field == null) throw new NullPointerException();
-    Object[] params = {"$." + field};
-    db.run("create", "CREATE INDEX IF NOT EXISTS " + collName + "_idx ON " + collName + "(json_extract(value, ?))", params, klass, collName);
+  public void close() {
+    db.close();
   }
   
-  public <T1> T1 get(String key, Class<T1> klass) {
+  // TODO: indexing doesn't seem to do anything
+//  public void createIndex(String field) {
+//    if (field == null) throw new NullPointerException();
+//    Object[] params = {"$." + field};
+//    db.run("create", "CREATE INDEX IF NOT EXISTS " + collName + "_idx ON " + collName + "(json_extract(value, ?))", params, klass, collName);
+//  }
+  
+  public <T> T get(String key, Class<T> klass) {
     String json = get(key);
     if (json == null) return null;
     return JSONparse(json, klass);
@@ -115,7 +113,7 @@ public class Collection<T> {
       jsonId = field.get("id");
     }
     String exists = get(jsonId);
-    if(json.equals(exists)) return json; // don't update document which have no changes
+    if (json.equals(exists)) return json; // don't update document which have no changes
     
     String query = String.format("INSERT INTO %s VALUES(?, json(json_set(?, '$.%s', ?))) " +
         "ON CONFLICT(key) DO UPDATE SET value=json(excluded.value)", collName, idField);
@@ -124,7 +122,7 @@ public class Collection<T> {
     return db.run(exists != null ? "update" : "insert", query, params, klass, collName);
   }
   
-  public T save(Object document) {
+  public <T> T save(Object document) {
     if (document == null) throw new NullPointerException();
     
     if (document.getClass() != klass) try {
@@ -137,8 +135,8 @@ public class Collection<T> {
     Map<String, String> field = getIdField(document);
     String json = JSONstringify(document);
     String exists = get(field.get("id"));
-    if(json.equals(exists)) return (T) document; // don't update document which have no changes
-  
+    if (json.equals(exists)) return (T) document; // don't update document which have no changes
+    
     String query = String.format("INSERT INTO %s VALUES(?, json(?)) " +
         "ON CONFLICT(key) DO UPDATE SET value=json(excluded.value)", collName);
     Object[] params = {field.get("id"), json};
@@ -146,11 +144,11 @@ public class Collection<T> {
     return (T) document;
   }
   
-  public List<T> save(List<T> documents) {
+  public <T> List<T> save(List<T> documents) {
     return Arrays.asList(save(documents.toArray()));
   }
   
-  public T[] save(Object[] documents) {
+  public <T> T[] save(Object[] documents) {
     if (documents == null) throw new NullPointerException();
     for (Object doc : documents) {
       if (doc == null) throw new NullPointerException();
@@ -169,27 +167,27 @@ public class Collection<T> {
     return (T[]) documents;
   }
   
-  public List<T> find() {
+  public <T> List<T> find() {
     return find(null, null, 0, 0);
   }
   
-  public List<T> find(int limit, int offset) {
+  public <T> List<T> find(int limit, int offset) {
     return find(null, null, limit, offset);
   }
   
-  public List<T> find(String filter) {
+  public <T> List<T> find(String filter) {
     return find(filter, null, 0, 0);
   }
   
-  public List<T> find(String filter, int limit) {
+  public <T> List<T> find(String filter, int limit) {
     return find(filter, null, limit, 0);
   }
   
-  public List<T> find(String filter, int limit, int offset) {
+  public <T> List<T> find(String filter, int limit, int offset) {
     return find(filter, null, limit, offset);
   }
   
-  public List<T> find(String filter, String sort, int limit, int offset) {
+  public <T> List<T> find(String filter, String sort, int limit, int offset) {
     String jsonArray = findAsJson(filter, sort, limit, offset);
     if (jsonArray == null) return new ArrayList<>();
     try {
@@ -200,10 +198,15 @@ public class Collection<T> {
     return new ArrayList<>();
   }
   
-  public List<T> find(FindOptionsHandler option) {
+  public <T> List<T> find(FindOptionsHandler option) {
     FindOptions op = new FindOptions();
     option.handle(op);
-    return find(op.filter, op.sort, op.limit, op.offset);
+    return (List<T>) find(op.filter, op.sort, op.limit, op.offset);
+  }
+  
+  public <T> T findOne(String filter) {
+    List docs = find(filter, 1);
+    return docs != null ? (T) docs.get(0) : null;
   }
   
   public String findAsJson(FindOptionsHandler option) {
@@ -229,51 +232,18 @@ public class Collection<T> {
   }
   
   public String findAsJson(String filter, String sort, int limit, int offset) {
-    return "[" + findOneAsJson(filter, sort, limit, offset) + "]";
+    return "[" + db.findAsJson(collName, filter, sort, limit, offset) + "]";
   }
   
   public String findOneAsJson(String filter) {
-    return findOneAsJson(filter, null, 1, 0);
+    return db.findAsJson(collName, filter, null, 1, 0);
   }
   
-  private String findOneAsJson(String filter, String sort, int limit, int offset) {
-    if (filter == null) {
-      return db.get(String.format("SELECT GROUP_CONCAT(value) FROM (SELECT value FROM %1$s" +
-          (limit == 0 ? ")" : " LIMIT %2$d OFFSET %3$d)"), collName, limit, offset));
-    }
-    
-    // TODO: sort is slow on large datasets
-    String orderBy = "";
-    String[] order = new String[2];
-    if (sort != null) {
-      if (sort.endsWith("<")) {
-        order[0] = "$." + sort.substring(0, sort.length() - 1);
-        order[1] = "ASC";
-      } else if (sort.endsWith(">")) {
-        order[0] = "$." + sort.substring(0, sort.length() - 1);
-        order[1] = "DESC";
-      } else {
-        order = sort.split("=|==");
-        order[0] = "$." + order[0];
-      }
-      orderBy = " ORDER BY json_extract(value, ?) " + order[1];
-    }
-    
-    Map<String, List<String>> filters = generateWhereClause(filter);
-    String q = String.format("SELECT GROUP_CONCAT(value) FROM (SELECT value FROM %1$s"
-        + filters.get("query").get(0) + orderBy + (limit == 0 ? ")" : " LIMIT %2$d OFFSET %3$d)"), collName, limit, offset);
-  
-    List params = populateParams(filters);
-    if (sort != null) params.add(order[0]);
-    
-    return db.get(q, params.toArray());
-  }
-  
-  public T findById(String id) {
+  public <T> T findById(String id) {
     String json = findByIdAsJson(id);
     if (json == null) return null;
     try {
-      return mapper.readValue(json, klass);
+      return (T) mapper.readValue(json, klass);
     } catch (JsonProcessingException e) {
       e.printStackTrace();
     }
@@ -288,57 +258,42 @@ public class Collection<T> {
     if (document == null) throw new NullPointerException();
     
     Map<String, String> field = getIdField(document);
-    String q = String.format("DELETE FROM %1$s WHERE key=?", collName);
-    Object[] params = {field.get("id")};
-    return db.run("delete", q, params, klass, collName);
+    return deleteById(field.get("id"));
   }
   
   public String deleteById(String id) {
     if (id == null) throw new NullPointerException();
-    String q = String.format("DELETE FROM %1$s WHERE key=?", collName);
-    Object[] params = {id};
-    return db.run("delete", q, params, klass, collName);
+    return delete("key=" + id);
   }
   
   public String deleteOne(String filter) {
-    return deleteDocs(filter, 1);
+    return db.deleteDocs(collName, filter, 1, klass);
   }
   
   public String delete(String filter) {
-    return deleteDocs(filter, 0);
+    return db.deleteDocs(collName, filter, 0, klass);
   }
   
   public String delete() {
-    return deleteDocs(null, 0);
+    return db.deleteDocs(collName, null, 0, klass);
   }
   
   public String delete(DeleteOptionsHandler option) {
     DeleteOptions op = new DeleteOptions();
     option.handle(op);
-    return deleteDocs(op.filter, op.limit);
-  }
-  
-  private String deleteDocs(String filter, int limit) {
-    if (filter == null) {
-      return db.run("delete", String.format("DELETE FROM %1$s", collName), klass, collName);
-    }
-    
-    Map<String, List<String>> filters = generateWhereClause(filter);
-    String q;
-    if (limit == 0) {
-      q = String.format("DELETE FROM %1$s" + filters.get("query").get(0), collName);
-    } else {
-      q = String.format("DELETE FROM %1$s WHERE %1$s.key = (SELECT %1$s.key FROM %1$s"
-          + filters.get("query").get(0) + " LIMIT %2$d)", collName, limit);
-    }
-    List params = populateParams(filters);
-    
-    return db.run("delete", q, params.toArray(), klass, collName);
+    return db.deleteDocs(collName, op.filter, op.limit, klass);
   }
   
   public String updateFieldById(String id, String field, Object value) {
     if (id == null) throw new NullPointerException();
     return updateField(id, field, value);
+  }
+  
+  public String updateField(Object document, String field, Object value) {
+    Map<String, String> idField = getIdField(document);
+    if(get(idField.get("id")) == null) throw new NullPointerException();
+    
+    return updateFieldById(idField.get("id"), field, value);
   }
   
   public String updateField(String field, Object value) {
@@ -347,11 +302,11 @@ public class Collection<T> {
   
   public String updateField(String filter, String field, Object value) {
     if (field == null) throw new NullPointerException();
-  
+    
     if (filter != null) {
       Object[] params = {"$." + field, filter};
       String oldValue = db.get("SELECT json_extract(value, ?) FROM " + collName + " WHERE key = ?", params);
-      if(oldValue.equals(value)) return "same value"; // don't update same value
+      if (value.equals(oldValue)) return "same value"; // don't update same value
     }
     
     if (filter != null && filter.matches("[\\w_]+")) {
@@ -363,8 +318,8 @@ public class Collection<T> {
     List params = new ArrayList();
     
     if (filter != null) {
-      Map<String, List<String>> filters = generateWhereClause(filter);
-      params = populateParams(filters);
+      Map<String, List<String>> filters = db.generateWhereClause(filter);
+      params = db.populateParams(filters);
       query += filters.get("query").get(0);
     }
     
@@ -399,7 +354,7 @@ public class Collection<T> {
     return db.run("update", String.format("UPDATE %1$s SET value = json_remove(value, ?)", collName), params3, klass, collName);
   }
   
-  public int size() {
+  public int count() {
     try {
       PreparedStatement stmt = db.conn.prepareStatement("SELECT count(*) FROM " + collName);
       ResultSet rs = stmt.executeQuery();
@@ -434,105 +389,6 @@ public class Collection<T> {
       e.printStackTrace();
       return null;
     }
-  }
-  
-  private List populateParams(Map<String, List<String>> filters) {
-    List params = new ArrayList();
-    
-    for (int i = 0; i < filters.get("paths").size(); i++) {
-      params.add(filters.get("paths").get(i));
-      String[] inValues = {filters.get("values").get(i)};
-      
-      if (inValues[0].startsWith("[") && inValues[0].endsWith("]")) {
-        inValues[0] = inValues[0].replaceAll("^\\[", "").replaceAll("]$", "");
-        inValues = inValues[0].split(",");
-      }
-      
-      for (String value : inValues) {
-        if (Utils.isNumeric(value)) {
-          if (value.contains(".")) { // with decimals
-            try {
-              params.add(Double.parseDouble(value));
-            } catch (Exception tryFloat) {
-              try {
-                params.add(Float.parseFloat(value));
-              } catch (Exception e) {
-                e.printStackTrace();
-              }
-            }
-          } else { // without decimals
-            try {
-              params.add(Integer.parseInt(value));
-            } catch (Exception tryLong) {
-              try {
-                params.add(Long.parseLong(value));
-              } catch (Exception e) {
-                e.printStackTrace();
-              }
-            }
-          }
-        } else { // not a number
-          params.add(value);
-        }
-      }
-    }
-    return params;
-  }
-  
-  private Map<String, List<String>> generateWhereClause(String filter) {
-    filter = filter.replace(" ", "");
-    List<String> paths = new ArrayList<>();
-    List<String> values = new ArrayList<>();
-    boolean useRegex = true;
-    String regex = useRegex ? "([\\w\\.\\[\\]]+)(~~|=~|==|>=|<=|!=|<|>|=)([%\\-,\\^_\\w\\.\\[\\]\\(\\)\\?\\>\\<\\:\\=\\{\\}\\+\\*\\$\\\\\\/]+\\|{0,1}[%\\-,\\^_\\w\\.\\[\\]\\(\\)\\?\\>\\<\\:\\=\\{\\}\\+\\*\\$\\\\\\/]*(?<!\\|))(&&|\\|\\|)?"
-        : "([\\w\\.\\[\\]]+)(=~|==|>=|<=|!=|<|>|=)([%\\-,\\_\\w\\.\\[\\]!?]+)(&&|\\|\\|)?";
-    String query = " WHERE" + new Rewriter(regex) {
-      public String replacement() {
-        paths.add("$." + group(1));
-        String val = group(3);
-        String comparator;
-        if ((group(2).equals("==") || group(2).equals("="))
-            && (val.startsWith("[") && val.endsWith("]"))) {
-          
-          String[] inValues = val.split(",");
-          comparator = " IN (";
-          
-          for (String in : inValues) {
-            comparator += "?,";
-          }
-          values.add(val);
-          comparator = comparator.replaceAll(",$", ")");
-        } else {
-          comparator = group(2) + " ?";
-        }
-        if (group(2).equals("=~")) {
-          comparator = "LIKE ?";
-          if (val.contains("%") || val.contains("_")) {
-            values.add(val);
-          } else {
-            values.add("%" + val + "%");
-          }
-        } else if (useRegex && group(2).equals("~~")) {
-          comparator = "REGEXP ?";
-          values.add(val);
-        } else {
-          if (useRegex && val.endsWith(")")) {
-            comparator += ")";
-            val = val.replaceAll("\\)$", "");
-          }
-          values.add(val);
-        }
-        String andOr = group(4) == null ? "" : (group(4).equals("&&") ? "AND" : "OR");
-        return String.format(" json_extract(value, ?) %s %s", comparator, andOr);
-      }
-    }.rewrite(filter);
-    
-    Map<String, List<String>> map = new HashMap<>();
-    map.put("query", Collections.singletonList(query));
-    map.put("paths", paths);
-    map.put("values", values);
-    
-    return map;
   }
   
   private Map<String, String> getIdField() {
