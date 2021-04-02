@@ -387,7 +387,7 @@ public class CollectionTest {
     long sum = 0;
     
     for(int i = 0; i < iter; i++) {
-      for(var u : importedTestUsers) {
+      for(TestUser u : importedTestUsers) {
         u.setUid(null);
       }
       start();
