@@ -1,2 +1,2 @@
 # NoSQLite
-Java single file NoSQL database utilizing SQLite JSON1 extension
+Java single file NoSQL nosqlite utilizing SQLite JSON1 extension

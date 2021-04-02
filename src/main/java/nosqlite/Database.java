@@ -1,8 +1,8 @@
-package database;
+package nosqlite;
 
-import database.annotations.Document;
-import database.handlers.CollectionConfig;
-import database.handlers.CollectionConfigHandler;
+import nosqlite.annotations.Document;
+import nosqlite.handlers.CollectionConfig;
+import nosqlite.handlers.CollectionConfigHandler;
 import org.reflections8.Reflections;
 
 import java.io.File;
@@ -29,7 +29,9 @@ public class Database {
     if(!dbPath.equals(":memory:")) {
       dbPath = dbPath.replaceAll("^/", "");
       File dir = new File(dbPath);
-      dir.getParentFile().mkdirs();
+      if(dir.getParentFile() != null) {
+        dir.getParentFile().mkdirs();
+      }
     }
 
     try {

@@ -1,6 +1,4 @@
-package database.handlers;
-
-import database.handlers.FindOptions;
+package nosqlite.handlers;
 
 @FunctionalInterface
 public interface FindOptionsHandler {

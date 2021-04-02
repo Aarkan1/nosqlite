@@ -1,7 +1,7 @@
 package test_entities;
 
-import database.annotations.Document;
-import database.annotations.Id;
+import nosqlite.annotations.Document;
+import nosqlite.annotations.Id;
 
 @Document
 public class TestCat {

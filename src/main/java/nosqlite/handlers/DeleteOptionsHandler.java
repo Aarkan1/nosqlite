@@ -1,4 +1,4 @@
-package database.handlers;
+package nosqlite.handlers;
 
 @FunctionalInterface
 public interface DeleteOptionsHandler {

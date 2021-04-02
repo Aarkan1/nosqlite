@@ -1,4 +1,4 @@
-package database.handlers;
+package nosqlite.handlers;
 
 public class DeleteOptions {
   public String filter = null;

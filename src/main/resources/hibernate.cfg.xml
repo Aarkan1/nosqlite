@@ -21,7 +21,7 @@
 <!--        <property name="connection.pool_size">2</property>-->
 
         <!-- SQL dialect -->
-        <property name="dialect">database.SQLiteDialect</property>
+        <property name="dialect">nosqlite.SQLiteDialect</property>
 
         <!-- Enable Hibernate's automatic session context management -->
         <property name="current_session_context_class">thread</property>
@@ -32,7 +32,7 @@
         <!-- Echo all executed SQL to stdout -->
         <property name="show_sql">true</property>
 
-        <!-- Drop and re-create the database schema on startup -->
+        <!-- Drop and re-create the nosqlite schema on startup -->
         <property name="hbm2ddl.auto">update</property>
 
 <!--        <mapping class="test_entities.TestCat"/>-->

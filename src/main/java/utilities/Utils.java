@@ -1,7 +1,7 @@
 package utilities;
 
 import com.aventrix.jnanoid.jnanoid.NanoIdUtils;
-import database.annotations.Id;
+import nosqlite.annotations.Id;
 
 import java.io.InputStream;
 import java.lang.reflect.Field;

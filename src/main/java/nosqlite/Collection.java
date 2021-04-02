@@ -1,15 +1,16 @@
-package database;
+package nosqlite;
 
 import com.aventrix.jnanoid.jnanoid.NanoIdUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import database.annotations.Id;
-import database.exceptions.IdAnnotationMissingException;
-import database.exceptions.TypeMismatchException;
-import database.handlers.*;
+import nosqlite.annotations.Id;
+import nosqlite.exceptions.IdAnnotationMissingException;
+import nosqlite.exceptions.TypeMismatchException;
+import nosqlite.handlers.*;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.sql.*;
 import java.util.*;
 
@@ -303,18 +304,27 @@ public class Collection {
   public String updateField(String filter, String field, Object value) {
     if (field == null) throw new NullPointerException();
     
+    boolean isJson = false;
+    
+    if (!(value instanceof String) && !value.getClass().isPrimitive()) {
+      value = JSONstringify(value);
+      Object[] params = {value};
+      isJson = db.get("SELECT json_valid(?)", params).equals("1");
+    }
+    
     if (filter != null) {
       Object[] params = {"$." + field, filter};
       String oldValue = db.get("SELECT json_extract(value, ?) FROM " + collName + " WHERE key = ?", params);
       if (value.equals(oldValue)) return "same value"; // don't update same value
     }
     
+    // by id
     if (filter != null && filter.matches("[\\w_]+")) {
       Object[] params = {"$." + field, value, filter};
-      return db.run("update", "UPDATE " + collName + " SET value = json_replace(value, ?, ?) WHERE key = ?", params, klass, collName);
+      return db.run("update", "UPDATE " + collName + " SET value = json_replace(value, ?, " + (isJson ? "json(?)" : "?") + ") WHERE key = ?", params, klass, collName);
     }
     
-    String query = "UPDATE " + collName + " SET value = json_replace(value, ?, ?)";
+    String query = "UPDATE " + collName + " SET value = json_replace(value, ?, " + (isJson ? "json(?))" : "?)");
     List params = new ArrayList();
     
     if (filter != null) {
@@ -393,8 +403,8 @@ public class Collection {
   
   private Map<String, String> getIdField() {
     try {
-      return getIdField(klass.newInstance());
-    } catch (InstantiationException | IllegalAccessException e) {
+      return getIdField(klass.getDeclaredConstructor().newInstance());
+    } catch (InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
       e.printStackTrace();
     }
     return null;

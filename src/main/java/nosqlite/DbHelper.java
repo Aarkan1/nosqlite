@@ -1,9 +1,9 @@
-package database;
+package nosqlite;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import database.handlers.WatchData;
-import database.handlers.WatchHandler;
+import nosqlite.handlers.WatchData;
+import nosqlite.handlers.WatchHandler;
 import org.sqlite.Function;
 import utilities.Rewriter;
 import utilities.Utils;
@@ -129,23 +129,19 @@ class DbHelper {
     }
     
     if (!query.startsWith("CREATE")) {
-      try {
-        // don't bother converting json if there's no watchers
-        if (!method.equals("none")
-            && get[1] != null
-            && !get[1].equals("deleted")
-            && !get[1].endsWith("all")
-            && (eventWatchers.get(collName) != null || watchers.get(collName) != null)) {
-          
-          // must be a json array for watchers
-          if(!get[1].startsWith("[")) get[1] = "[" + get[1] + "]";
-          updateWatchers(collName, get[0], new WatchData(collName, get[0],
-              mapper.readValue(get[1],
-                  mapper.getTypeFactory().constructCollectionType(List.class, coll))));
-        }
+      // don't bother converting json if there's no watchers
+      if (!method.equals("none")
+          && get[1] != null
+          && !get[1].equals("deleted")
+          && !get[1].endsWith("all")
+          && (eventWatchers.get(collName) != null || watchers.get(collName) != null)) {
         
-        return get[1];
-      } catch (JsonProcessingException ignore) { }
+        // must be a json array for watchers
+        if(!get[1].startsWith("[")) get[1] = "[" + get[1] + "]";
+        updateWatchers(collName, get[0], get[1], coll);
+      }
+      
+      return get[1];
     }
     return null;
   }
@@ -238,8 +234,7 @@ class DbHelper {
       
       // don't bother converting json if there's no watchers
       if (eventWatchers.get(collName) != null || watchers.get(collName) != null) {
-        updateWatchers(collName, "insert", new WatchData(collName, "insert",
-            mapper.readValue(docs.toString(), mapper.getTypeFactory().constructCollectionType(List.class, coll))));
+        updateWatchers(collName, "insert", docs.toString(), coll);
       }
       return mapper.writeValueAsString(docs);
     } catch (SQLException | JsonProcessingException e) {
@@ -322,18 +317,13 @@ class DbHelper {
     }
     deletedDocs = "[" + deletedDocs +"]";
   
-    if (deleted.equals("deleted")) try {
+    if (deleted.equals("deleted"))
       // don't bother converting json if there's no watchers
       if (eventWatchers.get(collName) != null || watchers.get(collName) != null) {
-        updateWatchers(collName, "delete", new WatchData(collName, "delete",
-            mapper.readValue(deletedDocs, mapper.getTypeFactory().constructCollectionType(List.class, klass))));
+        updateWatchers(collName, "delete", deletedDocs, klass);
       }
-      return deletedDocs;
-    } catch (JsonProcessingException e) {
-      e.printStackTrace();
-    }
     
-    return null;
+    return deletedDocs;
   }
   
   void watch(String collName, WatchHandler watcher) {
@@ -347,17 +337,51 @@ class DbHelper {
     eventWatchers.get(collName).get(event.toLowerCase()).add(watcher);
   }
   
-  void updateWatchers(String collName, String event, WatchData watchData) {
+  void updateWatchers(String collName, String event, String docs, Class coll) {
     if (event.equals("none")) return;
+    WatchData watchData = null;
+    if(!runAsync) try {
+      watchData = new WatchData(collName, event,
+          mapper.readValue(docs, mapper.getTypeFactory().constructCollectionType(List.class, coll)));
+    } catch (JsonProcessingException e) {
+      e.printStackTrace();
+    }
     
     if (eventWatchers.get(collName) != null && eventWatchers.get(collName).get(event) != null) {
-      if (runAsync)
-        watchExecutor.submit(() -> eventWatchers.get(collName).get(event).forEach(w -> w.handle(watchData)));
-      else eventWatchers.get(collName).get(event).forEach(w -> w.handle(watchData));
+      if (runAsync) watchExecutor.submit(() -> {
+          WatchData watchDataAsync = null;
+          try {
+            watchDataAsync = new WatchData(collName, event,
+                mapper.readValue(docs, mapper.getTypeFactory().constructCollectionType(List.class, coll)));
+          } catch (JsonProcessingException e) {
+            e.printStackTrace();
+          }
+  
+        WatchData finalWatchDataAsync = watchDataAsync;
+        eventWatchers.get(collName).get(event).forEach(w -> w.handle(finalWatchDataAsync));
+        });
+      else {
+        WatchData finalWatchData = watchData;
+        eventWatchers.get(collName).get(event).forEach(w -> w.handle(finalWatchData));
+      }
     }
     if (watchers.get(collName) != null) {
-      if (runAsync) watchExecutor.submit(() -> watchers.get(collName).forEach(w -> w.handle(watchData)));
-      else watchers.get(collName).forEach(w -> w.handle(watchData));
+      if (runAsync) watchExecutor.submit(() -> {
+        WatchData watchDataAsync = null;
+        try {
+          watchDataAsync = new WatchData(collName, event,
+              mapper.readValue(docs, mapper.getTypeFactory().constructCollectionType(List.class, coll)));
+        } catch (JsonProcessingException e) {
+          e.printStackTrace();
+        }
+  
+        WatchData finalWatchDataAsync = watchDataAsync;
+        watchers.get(collName).forEach(w -> w.handle(finalWatchDataAsync));
+      });
+      else {
+        WatchData finalWatchData1 = watchData;
+        watchers.get(collName).forEach(w -> w.handle(finalWatchData1));
+      }
     }
   }
   

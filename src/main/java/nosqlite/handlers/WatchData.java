@@ -1,4 +1,4 @@
-package database.handlers;
+package nosqlite.handlers;
 
 import java.util.List;
 

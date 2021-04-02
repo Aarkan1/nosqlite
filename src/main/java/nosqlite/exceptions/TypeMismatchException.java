@@ -1,4 +1,4 @@
-package database.exceptions;
+package nosqlite.exceptions;
 
 public class TypeMismatchException extends Throwable {
   public TypeMismatchException(String message) {

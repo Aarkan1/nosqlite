@@ -11,7 +11,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
-import static database.Database.collection;
+import static nosqlite.Database.collection;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static utilities.Filter.*;
@@ -25,7 +25,7 @@ public class CollectionTest {
     collection(op -> {
 //      op.dbPath = "db/test.db";
       op.dbPath = ":memory:";
-      op.runAsync = false;
+//      op.runAsync = false;
     });
   }
   
@@ -41,7 +41,7 @@ public class CollectionTest {
     // stop collection threads
     collection(TestUser.class).close();
     collection(TestCat.class).close();
-    
+  
     File testdb = new File("db/test.db");
     testdb.delete();
   }
@@ -272,20 +272,25 @@ public class CollectionTest {
     collection(TestUser.class).save(testUser);
   
     collection(TestUser.class).updateFieldById("abc123", "username", "User-B");
-    TestUser afterUpdate1 = collection(TestUser.class).findById("abc123");
-    assertEquals(afterUpdate1.getUsername(), "User-B");
+    TestUser afterUpdate = collection(TestUser.class).findById("abc123");
+    assertEquals(afterUpdate.getUsername(), "User-B");
     
     collection(TestUser.class).updateFieldById("abc123", "testCat.name", "Cat-B");
-    TestUser afterUpdate2 = collection(TestUser.class).findById("abc123");
-    assertEquals(afterUpdate2.getTestCat().getName(), "Cat-B");
+    afterUpdate = collection(TestUser.class).findById("abc123");
+    assertEquals(afterUpdate.getTestCat().getName(), "Cat-B");
     
     collection(TestUser.class).updateField("testCat.color", "orange");
-    TestUser afterUpdate3 = collection(TestUser.class).findById("abc123");
-    assertEquals(afterUpdate3.getTestCat().getColor(), "orange");
+    afterUpdate = collection(TestUser.class).findById("abc123");
+    assertEquals(afterUpdate.getTestCat().getColor(), "orange");
     
     collection(TestUser.class).updateField(testUser, "testCat.color", "blue");
-    TestUser afterUpdate4 = collection(TestUser.class).findById("abc123");
-    assertEquals(afterUpdate4.getTestCat().getColor(), "blue");
+    afterUpdate = collection(TestUser.class).findById("abc123");
+    assertEquals(afterUpdate.getTestCat().getColor(), "blue");
+    
+    collection(TestUser.class).updateField(testUser, "testCat", new TestCat("Cat-C", "purple", 2, new TestRace("Norwegian Forest", 2 )));
+    afterUpdate = collection(TestUser.class).findById("abc123");
+    assertEquals(afterUpdate.getTestCat().getName(), "Cat-C");
+    assertEquals(afterUpdate.getTestCat().getTestRace().getTime(), 2);
   }
   
   @Test
@@ -344,6 +349,14 @@ public class CollectionTest {
     collection(TestUser.class).save(user);
     collection(TestUser.class).updateFieldById("abc123", "username", "Test-2");
     collection(TestUser.class).delete(user);
+  
+    try {
+      Thread.sleep(1000);
+    } catch (InterruptedException e) {
+      e.printStackTrace();
+    }
+    File testdb = new File("db/test.db");
+    testdb.delete();
   }
   
   @Disabled

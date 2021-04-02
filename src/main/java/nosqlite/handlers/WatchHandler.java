@@ -1,6 +1,4 @@
-package database.handlers;
-
-import database.handlers.WatchData;
+package nosqlite.handlers;
 
 @FunctionalInterface
 public interface WatchHandler {
