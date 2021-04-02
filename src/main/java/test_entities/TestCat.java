@@ -3,7 +3,7 @@ package test_entities;
 import nosqlite.annotations.Document;
 import nosqlite.annotations.Id;
 
-@Document
+//@Document
 public class TestCat {
 
   @Id
