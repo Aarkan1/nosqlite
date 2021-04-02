@@ -19,6 +19,8 @@ public class Database {
   private static DbHelper dbHelper = null;
   private static Database singleton = null;
   private static boolean runAsync = true;
+  private static boolean useBrowser = false;
+  private static boolean useWatchers = false;
   private static String dbPath = "db/data.db";
 
   private Database() {
@@ -71,7 +73,11 @@ public class Database {
       config.handle(op);
       runAsync = op.runAsync;
       dbPath = op.dbPath;
+      useBrowser = op.useBrowser;
+      useWatchers = op.useWatchers;
       singleton = new Database();
+    } else {
+      System.err.println("collection with config must be called before any other collection call");
     }
   }
 }
