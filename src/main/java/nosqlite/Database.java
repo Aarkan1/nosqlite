@@ -19,9 +19,9 @@ public class Database {
   private static DbHelper dbHelper = null;
   private static Database singleton = null;
   private static boolean runAsync = true;
-  private static boolean useBrowser = false;
-  private static boolean useWatchers = false;
-  private static String dbPath = "db/data.db";
+  public static boolean useBrowser = false;
+  public static boolean useWatchers = false;
+  public static String dbPath = "db/data.db";
 
   private Database() {
     initDatabase();
