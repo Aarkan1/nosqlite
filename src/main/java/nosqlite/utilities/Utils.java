@@ -1,19 +1,49 @@
-package utilities;
+package nosqlite.utilities;
 
 import com.aventrix.jnanoid.jnanoid.NanoIdUtils;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import nosqlite.annotations.Id;
 
 import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.net.URL;
-import java.sql.Blob;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.sql.Timestamp;
+import java.sql.*;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public abstract class Utils {
+  private static final ObjectMapper mapper = new ObjectMapper();
+  
+  public static <T> T resultSetToObject(ResultSet rs, Class<T> klass) throws SQLException, JsonProcessingException {
+    String json = resultSetToJson(rs);
+    if(json == null) return null;
+    
+    return mapper.readValue(json, klass);
+  }
+  
+  public static String resultSetToJson(ResultSet rs) throws SQLException, JsonProcessingException {
+    List<Map<String, Object>> rows = new ArrayList<>();
+    ResultSetMetaData rsmd = rs.getMetaData();
+    int columnCount = rsmd.getColumnCount();
+    
+    while (rs.next()) {
+      // Represent a row in DB. Key: Column name, Value: Column value
+      Map<String, Object> row = new HashMap<>();
+      for (int i = 1; i <= columnCount; i++) {
+        // Note that the index is 1-based
+        String colName = rsmd.getColumnName(i);
+        Object colVal = rs.getObject(i);
+        row.put(colName, colVal);
+      }
+      rows.add(row);
+    }
+    
+    return mapper.writeValueAsString(rows);
+  }
+  
   public static boolean isNumeric(String str) {
     if (str == null)
       return false;

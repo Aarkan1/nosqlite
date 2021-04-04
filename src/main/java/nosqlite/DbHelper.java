@@ -5,8 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import nosqlite.handlers.WatchData;
 import nosqlite.handlers.WatchHandler;
 import org.sqlite.Function;
-import utilities.Rewriter;
-import utilities.Utils;
+import nosqlite.utilities.Rewriter;
+import nosqlite.utilities.Utils;
 
 import java.sql.*;
 import java.util.*;

@@ -1,4 +1,4 @@
-package utilities;
+package nosqlite.utilities;
 
 import java.util.regex.*;
 

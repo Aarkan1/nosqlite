@@ -14,7 +14,7 @@ import java.util.List;
 import static nosqlite.Database.collection;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static utilities.Filter.*;
+import static nosqlite.utilities.Filter.*;
 
 public class CollectionTest {
   private long time;
