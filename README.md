@@ -12,7 +12,7 @@ It's a server-less embedded document database, ideal for small web applications.
 ```java
 import static nosqlite.Database.collection;
 
-User john = new User("John").
+User john = new User("John");
 collection("User").save(john);  // create or update user
 
 List<User> users = collection("User").find();  // get all users
@@ -24,7 +24,6 @@ List<User> users = collection("User").find();  // get all users
 - [Import](#import)
 - [Export](#export)
 - [Drop](#drop)
-  - [Important note!](#important-note)
 - [document](#document)
 - [Collection methods](#collection-methods)
   - [Filters](#filters)
@@ -32,22 +31,15 @@ List<User> users = collection("User").find();  // get all users
 - [Collection Examples](#collection-examples)
 
 ## Getting started
-The Express app has an embedded nosql database, ready to be used if you enable it by adding `app.enableCollections()` right after app is instantiated.
-This will create a database-file in your project. Easy to deploy or share.
-When collections are enabled you can use the static `collection()`-method to manipulate the database.
+Collections can be used with the static `collection()`-method to manipulate the database.
 **collection()** takes either a String with the classname, case sensitive, or the Class itself.
+This will create a database-file in your project. Easy to deploy or share. 
 
 ```java
 import static nosqlite.Database.collection;
 
-Express app = new Express();
-// creates a database-file in /db-folder called 'embedded.db'
-app.enableCollections(); 
-// creates the file at target path
-app.enableCollections(String dbPath); 
-
-
-User john = new User("John").
+// creates a database-file in /db-folder called 'data.db'
+User john = new User("John");
 // generates an UUID
 collection("User").save(john); 
 
@@ -64,17 +56,21 @@ List<User> users = collection("User").find();
 List<User> users = collection(User.class).find();
 
 List<User> usersNamedJohn = collection("User").find(eq("name", "John"));
+
+// or with the statement syntax
+List<User> usersNamedJohn = collection("User").find("name==John"); 
 ```
 
 Watch a collection on changes
 ```java
-// watchData has 2 fields. 
-// getEvent() is the event triggered - 'insert', 'update' or 'delete'
-// getData() is a list with effected documents
+// watchData has 3 fields. 
+// model - is the document class that was triggered 
+// event - is the event triggered - 'insert', 'update' or 'delete'
+// data - is a list with effected documents
 collection("User").watch(watchData -> {
-    List<User> effectedUsers = watchData.getData();
+    List<User> effectedUsers = (List<User>) watchData.data;
 
-    switch(watchData.getEvent()) {
+    switch(watchData.event) {
         case "insert": // on created document
         break;
 
@@ -90,21 +86,28 @@ collection("User").watch(watchData -> {
 ### CollectionOptions
 CollectionOptions can be passed when enabling collections to set certain options.
 Options available are:
-- *CollectionOptions.ENABLE_WATCHER* - Enables WebSocket listener on collection changes
-- *CollectionOptions.DISABLE_BROWSER* - Disables collection browser (good when deploying)
+- *dbPath* - The default path is "db/data.db". You can override that with this option. 
+- *useWatcher* - Enable WebSocket listener on collection changes
+- *useBrowser* - Enable collection browser (good when developing)
+
+Note: options must be called before any other call with collection()! 
 
 You can pass one or multiple options when enabling collections:
 ```java
-Express app = new Express();
-app.enableCollections(CollectionOptions.ENABLE_WATCHER, CollectionOptions.DISABLE_BROWSER);
+// default options 
+collection(option -> {
+    option.dbPath = "db/data.db";
+    option.useWatcher = false;
+    option.useBrowser = false; 
+});
 ```
 
-**ENABLE_WATCHER**
+**useWatcher**
 
 This starts an `WebSocket` endpoint in the database that will send *watchData* when a change happens.
 
-**WatchData** is an object containing *document*, *event*, *data*.
-- *document*: The collection that were triggered
+**WatchData** is an object containing *model*, *event*, *data*.
+- *model*: The collection that were triggered
 - *event*: The event that was triggered, 'insert', 'update' or 'delete'
 - *data*: List of items that are related to the change
 
@@ -136,8 +139,9 @@ ws.onmessage = messageEvent => {
 
 Java:
 ```java
-Express app = new Express();
-app.enableCollections(CollectionOptions.ENABLE_WATCHER);
+collection(option -> {
+    option.useWatcher = true;
+}); 
 ```
 
 JavaScript:
@@ -145,20 +149,20 @@ JavaScript:
 ws.onmessage = messageEvent => {
     const watchData = JSON.parse(messageEvent.data);
 
-    // deconstruct document, event and data from watchData
-    const { document, event, data } = watchData;
+    // deconstruct model, event and data from watchData
+    const { model, event, data } = watchData;
 
     switch(event) {
         case 'insert':
             // add post to list
-            document == 'BlogPost' && posts.push(data[0]);
-            document == 'Message' && // add message to list
+            model == 'BlogPost' && posts.push(data[0]);
+            model == 'Message' && // add message to list
         break;
         case 'update':
         break;
         case 'delete':
             // remove post from list
-            document == 'BlogPost' && (posts = posts.filter(post => post.id !== data[0].id));
+            model == 'BlogPost' && (posts = posts.filter(post => post.id !== data[0].id));
         break;
     };
 
@@ -167,13 +171,15 @@ ws.onmessage = messageEvent => {
 };
 ```
 
-**DISABLE_BROWSER**
+**useBrowser**
 
-This will simply disable the collection browser. This might be a good idea to save CPU and RAM when deploying.
+This will enable the collection browser. This lets you peek at the stored data while developing. 
+It might be a good idea to disable this when deploying to save CPU and RAM.
 
 ```java
-Express app = new Express();
-app.enableCollections(CollectionOptions.DISABLE_BROWSER);
+collection(option -> {
+    option.useBrowser = true; 
+});
 ```
 
 ## Import
@@ -194,10 +200,8 @@ The .json-file is also created in the db-directory with the name of the document
 Will delete all data in the collection.
 
 ### Important note!
-After a document is saved to the collection, the class with **@document** annotation **CANNOT** be moved to another package or renamed. This will corrupt the database-file, and will have to be removed.
-Keep backups!
-
-Changing the name of a field will not corrupt the database, but will remove the value from all documents.
+Changing the name of a field will not corrupt the database, but will temporarily remove the value from all documents.
+Simply revert the name and the value gets restored. 
 
 ## Document
 Collections can be used as a simple Key/Value store, but it's true potential is when using it with POJOs. (Plain Old Java Objects)
