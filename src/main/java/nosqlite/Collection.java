@@ -14,6 +14,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.sql.*;
 import java.util.*;
 
+/**
+ * @author Johan Wirén
+ */
 @SuppressWarnings("unchecked")
 public class Collection {
   private Class klass;

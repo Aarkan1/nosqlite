@@ -14,6 +14,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * @author Johan Wirén
+ */
 public abstract class Utils {
   private static final ObjectMapper mapper = new ObjectMapper();
   

@@ -16,6 +16,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static nosqlite.utilities.Filter.*;
 
+/**
+ * @author Johan Wirén
+ */
 public class CollectionTest {
   private long time;
   
@@ -52,7 +55,7 @@ public class CollectionTest {
     testUser.setUid("OMqGBZy-AIHXKcyZSGMQe");
     assertEquals(testUser, collection(TestUser.class).save(testUser));
     
-    String json = "{\"uid\":\"OMqGBZy-AIHXKcyZSGMQe\",\"username\":\"Loke\",\"password\":\"abc123\",\"age\":0,\"testCat\":null}";
+    String json = "{\"uid\":\"OMqGBZy-AIHXKcyZSGMQe\",\"username\":\"Loke\",\"password\":\"abc123\",\"age\":0,\"testCats\":[]}";
     assertEquals(json, collection(TestUser.class).findByIdAsJson(testUser.getUid()));
   }
   
@@ -86,20 +89,33 @@ public class CollectionTest {
   @Test
   public void testGetString() {}
   
-  
   @Test
   public void testRemove() {}
   
   @Test
+  public void testFindOptions() {
+    testSaveList();
+  
+//    System.out.println(collection(TestUser.class).find(op -> {
+//      op.filter = "testCats[0].testRace.type==Main Coon";
+//      op.limit = 10;
+//      op.offset = 10;
+//      op.sort = "uid=asc";
+//    }));
+  
+//    System.out.println(collection(TestUser.class).find("testCats[0].testRace.type==Main Coon", 10));
+  }
+  
+  @Test
   public void testFind() {
     testSaveList();
-    
     assertEquals(collection(TestUser.class).find().size(), 100);
+    
 //  eq
     assertEquals(collection(TestUser.class).find("username=User-1").size(), 1);
-    assertEquals(collection(TestUser.class).find("testCat.name = Cat-1").size(), 1);
-    assertEquals(collection(TestUser.class).find("testCat.testRace.type=Main Coon").size(), 50);
-    assertEquals(collection(TestUser.class).find(eq("testCat.testRace.type", "Main Coon")).size(), 50);
+    assertEquals(collection(TestUser.class).find("testCats[0].name = Cat-1").size(), 1);
+    assertEquals(collection(TestUser.class).find("testCats[0].testRace.type=Main Coon").size(), 50);
+    assertEquals(collection(TestUser.class).find(eq("testCats[0].testRace.type", "Main Coon")).size(), 50);
     
     TestUser testUser = (TestUser) collection(TestUser.class).find("username=User-1").get(0);
     assertTrue(testUser.getUsername().equals("User-1"));
@@ -115,8 +131,8 @@ public class CollectionTest {
 
 //  gte
     assertEquals(collection(TestUser.class).find("age >= 50").size(), 50);
-    assertEquals(collection(TestUser.class).find("testCat.age>=50").size(), 50);
-    assertEquals(collection(TestUser.class).find(gte("testCat.age", 50)).size(), 50);
+    assertEquals(collection(TestUser.class).find("testCats[0].age>=50").size(), 50);
+    assertEquals(collection(TestUser.class).find(gte("testCats[0].age", 50)).size(), 50);
 
 //  lt
     assertEquals(collection(TestUser.class).find("age < 20").size(), 20);
@@ -136,8 +152,8 @@ public class CollectionTest {
     assertEquals(collection(TestUser.class).find(regex("username","[0-3]$")).size(), 40);
 
 //  not
-    assertEquals(collection(TestUser.class).find("!(testCat.testRace.type=Main Coon&&testCat.testRace.time>=80)").size(), 80);
-    assertEquals(collection(TestUser.class).find("! ( testCat.testRace.type=Main Coon && testCat.testRace.time>=80 )").size(), 80);
+    assertEquals(collection(TestUser.class).find("!(testCats[0].testRace.type=Main Coon&&testCats[0].testRace.time>=80)").size(), 80);
+    assertEquals(collection(TestUser.class).find("! ( testCats[0].testRace.type=Main Coon && testCats[0].testRace.time>=80 )").size(), 80);
     assertEquals(collection(TestCat.class).find("!age < 20").size(), 80);
     assertEquals(collection(TestCat.class).find(not(lt("age",20))).size(), 80);
 
@@ -160,9 +176,9 @@ public class CollectionTest {
 
 //  and
     assertEquals(collection(TestUser.class).find("username=User-1 && age=1").size(), 1);
-    assertEquals(collection(TestUser.class).find("testCat.testRace.type=Main Coon&&testCat.testRace.time>=80").size(), 20);
-    assertEquals(collection(TestUser.class).find("  testCat.testRace.type  =  Main Coon  &&  testCat.testRace.time  >=  80  ").size(), 20);
-    assertEquals(collection(TestUser.class).find("testCat.testRace.type=Main Coon&&testCat.testRace.time>=80").size(), 20);
+    assertEquals(collection(TestUser.class).find("testCats[0].testRace.type=Main Coon&&testCats[0].testRace.time>=80").size(), 20);
+    assertEquals(collection(TestUser.class).find("  testCats[0].testRace.type  =  Main Coon  &&  testCats[0].testRace.time  >=  80  ").size(), 20);
+    assertEquals(collection(TestUser.class).find("testCats[0].testRace.type=Main Coon&&testCats[0].testRace.time>=80").size(), 20);
     assertEquals(collection(TestCat.class).find("age>=40&&(testRace.type=Norwegian Forest||testRace.type=Main Coon)").size(), 60);
     assertEquals(collection(TestCat.class).find("age >= 40 && ( testRace.type = Norwegian Forest || testRace.type = Main Coon )").size(), 60);
     assertEquals(collection(TestCat.class).find(and(
@@ -218,17 +234,26 @@ public class CollectionTest {
     List<TestCat> testCats = new ArrayList<>();
     
     for(int i = 0; i < 100; i++) {
-      TestCat testCat = new TestCat("Cat-" + i, "gray", i,
+      TestCat testCat1 = new TestCat("Cat-" + i, "gray", i,
           new TestRace(
               i < 50 ? "Norwegian Forest" : "Main Coon",
               i
           ));
-      testCats.add(testCat);
+      TestCat testCat2 = new TestCat("Cat-2-" + i, "white", i,
+          new TestRace(
+              i < 50 ? "Norwegian Forest" : "Main Coon",
+              i
+          ));
+      testCats.add(testCat1);
       
-      testUsers.add(new TestUser("User-" + i,
+      TestUser testUser = new TestUser("User-" + i,
           "abc-" + i,
-          i,
-          testCat));
+          i);
+  
+      testUser.addTestCat(testCat1);
+      testUser.addTestCat(testCat2);
+      
+      testUsers.add(testUser);
     }
     collection(TestUser.class).save(testUsers);
     collection(TestCat.class).save(testCats);
@@ -265,8 +290,8 @@ public class CollectionTest {
   
   @Test
   public void testUpdateField() {
-    TestUser testUser = new TestUser("User-A", "abc-A", 1,
-        new TestCat("Cat-A", "gray", 1, new TestRace("Norwegian Forest", 1 )));
+    TestUser testUser = new TestUser("User-A", "abc-A", 1);
+    testUser.addTestCat(new TestCat("Cat-A", "gray", 1, new TestRace("Norwegian Forest", 1 )));
     testUser.setUid("abc123");
   
     collection(TestUser.class).save(testUser);
@@ -275,22 +300,22 @@ public class CollectionTest {
     TestUser afterUpdate = collection(TestUser.class).findById("abc123");
     assertEquals(afterUpdate.getUsername(), "User-B");
     
-    collection(TestUser.class).updateFieldById("abc123", "testCat.name", "Cat-B");
+    collection(TestUser.class).updateFieldById("abc123", "testCats[0].name", "Cat-B");
     afterUpdate = collection(TestUser.class).findById("abc123");
-    assertEquals(afterUpdate.getTestCat().getName(), "Cat-B");
+    assertEquals(afterUpdate.getTestCats().get(0).getName(), "Cat-B");
     
-    collection(TestUser.class).updateField("testCat.color", "orange");
+    collection(TestUser.class).updateField("testCats[0].color", "orange");
     afterUpdate = collection(TestUser.class).findById("abc123");
-    assertEquals(afterUpdate.getTestCat().getColor(), "orange");
+    assertEquals(afterUpdate.getTestCats().get(0).getColor(), "orange");
     
-    collection(TestUser.class).updateField(testUser, "testCat.color", "blue");
+    collection(TestUser.class).updateField(testUser, "testCats[0].color", "blue");
     afterUpdate = collection(TestUser.class).findById("abc123");
-    assertEquals(afterUpdate.getTestCat().getColor(), "blue");
+    assertEquals(afterUpdate.getTestCats().get(0).getColor(), "blue");
     
-    collection(TestUser.class).updateField(testUser, "testCat", new TestCat("Cat-C", "purple", 2, new TestRace("Norwegian Forest", 2 )));
+    collection(TestUser.class).updateField(testUser, "testCats[0].testRace", new TestRace("Race-A", 2 ));
     afterUpdate = collection(TestUser.class).findById("abc123");
-    assertEquals(afterUpdate.getTestCat().getName(), "Cat-C");
-    assertEquals(afterUpdate.getTestCat().getTestRace().getTime(), 2);
+    assertEquals(afterUpdate.getTestCats().get(0).getTestRace().getType(), "Race-A");
+    assertEquals(afterUpdate.getTestCats().get(0).getTestRace().getTime(), 2);
   }
   
   @Test
@@ -307,7 +332,7 @@ public class CollectionTest {
     user.setUid("abc123");
     
     collection(TestUser.class).watch(watchData -> {
-      assertEquals(watchData.entity, TestUser.class.getSimpleName());
+      assertEquals(watchData.model, TestUser.class.getSimpleName());
       TestUser userData = (TestUser) watchData.data.get(0);
       
       if(watchData.event.equals("insert")) {
@@ -362,13 +387,30 @@ public class CollectionTest {
   @Disabled
   @Test
   public void stressTest() {
-    populateUsers(100);
+    int iter = 100;
+    populateUsers(iter);
     
     start();
-    for(int i = 0; i < 1000; i++) {
-      collection(TestUser.class).save(new TestUser("name-" + i, "pass-" + i));
-    }
-    stop("saved 1000 individual docs");
+    int sortedCount = collection(TestUser.class).find(null, "testCats[0].testRace.type=asc", 0, 0).size();
+//    int sortedCount = collection(TestUser.class).find(op -> {
+//      op.filter = "age>30";
+//      op.sort = "testCats[0].testRace.type=asc";
+////      op.limit = 100;
+////      op.offset = 100;
+//    }).size();
+    stop("Sorted " + iter + "000 docs");
+    System.out.println("Sorted count: " + sortedCount);
+    
+    start();
+    int regexCount = collection(TestUser.class).find("username~~^(Joe|Ald|Ash).*").size();
+    stop("Regex on " + iter + "000 docs");
+    System.out.println("Regex count: " + regexCount);
+    
+//    start();
+//    for(int i = 0; i < 1000; i++) {
+//      collection(TestUser.class).save(new TestUser("name-" + i, "pass-" + i));
+//    }
+//    stop("saved 1000 individual docs");
     
     start();
     stop("size of " + collection(TestUser.class).count() + " docs");

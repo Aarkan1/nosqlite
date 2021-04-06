@@ -13,6 +13,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * @author Johan Wirén
+ */
 public class Database {
   private static Map<String, Collection> collections = new ConcurrentHashMap<>();
   private static Connection conn;
@@ -74,7 +77,7 @@ public class Database {
       runAsync = op.runAsync;
       dbPath = op.dbPath;
       useBrowser = op.useBrowser;
-      useWatchers = op.useWatchers;
+      useWatchers = op.useWatcher;
       singleton = new Database();
     } else {
       System.err.println("collection with config must be called before any other collection call");

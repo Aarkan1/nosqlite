@@ -2,16 +2,19 @@ package nosqlite.handlers;
 
 import java.util.List;
 
+/**
+ * @author Johan Wirén
+ */
 public class WatchData<T> {
-  public String entity;
+  public String model;
   public String event;
   public List<T> data;
 
   public WatchData() {
   }
 
-  public WatchData(String entity, String event, List<T> data) {
-    this.entity = entity;
+  public WatchData(String model, String event, List<T> data) {
+    this.model = model;
     this.event = event;
     this.data = data;
   }
@@ -19,7 +22,7 @@ public class WatchData<T> {
   @Override
   public String toString() {
     return "WatchData {" +
-        "\n  entity='" + entity + '\'' +
+        "\n  model='" + model + '\'' +
         "\n  event='" + event + '\'' +
         "\n  data=" + data +
         "\n}";

@@ -1,5 +1,8 @@
 package nosqlite.handlers;
 
+/**
+ * @author Johan Wirén
+ */
 public class FindOptions {
   public String filter = null;
   public String sort = null;

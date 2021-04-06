@@ -14,6 +14,9 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
+/**
+ * @author Johan Wirén
+ */
 @SuppressWarnings("unchecked")
 class DbHelper {
   Connection conn;
@@ -449,8 +452,8 @@ class DbHelper {
     List<String> values = new ArrayList<>();
     boolean useRegex = true;
     
-    String regex = useRegex ? "(\\s*\\!\\s*)?([\\(\\w\\s\\.\\[\\]]+)\\s*(~~|=~|==|>=|<=|!=|<|>|=)\\s*([%\\-,\\^_\\w\\.\\[\\]\\(\\)\\?\\>\\<\\:\\=\\{\\}\\+\\*\\$\\\\\\/]+\\|{0,1}[%\\-,\\^_\\w\\s\\.\\[\\]\\(\\)\\?\\>\\<\\:\\=\\{\\}\\+\\*\\$\\\\\\/]*(?<!\\|))\\)?(&&|\\|\\|)?"
-        : "(\\s*\\!\\s*)?([\\(\\w\\s\\.\\[\\]]+)\\s*(=~|==|>=|<=|!=|<|>|=)\\s*([%\\-,\\_\\w\\s\\.\\[\\]!?]+)\\)?(&&|\\|\\|)?";
+    String regex = useRegex ? "(\\s*\\!\\s*)?([\\(\\w\\s\\.\\[\\]]+)\\s*(~~|=~|==|>=|<=|!=|<|>|=)\\s*(([%\\-,\\^_\\w\\.\\[\\]\\(\\)\\?\\>\\<\\:\\=\\{\\}\\+\\*\\$\\\\\\/]*\\|{0,1}[%\\-,\\^_\\w\\s\\.\\[\\]\\(\\)\\?\\>\\<\\:\\=\\{\\}\\+\\*\\$\\\\\\/])*(?<!\\|))\\)?(&&|\\|\\|)?"
+        : "(\\s*\\!\\s*)?([\\(\\w\\s\\.\\[\\]]+)\\s*(=~|==|>=|<=|!=|<|>|=)\\s*([%\\-,\\_\\w\\s\\.\\[\\]!?]*)\\)?(&&|\\|\\|)?";
     
     String query = " WHERE" + new Rewriter(regex) {
       public String replacement() {
@@ -494,15 +497,16 @@ class DbHelper {
           }
         } else if (useRegex && group(3).equals("~~")) {
           comparator = "REGEXP ?";
-          values.add(val);
-        } else {
-          if (useRegex && val.endsWith(")")) {
-            comparator += ")";
-            val = val.replaceAll("\\s*\\)$", "");
-          }
-          values.add(val);
         }
-        String andOr = group(5) == null ? "" : (group(5).equals("&&") ? "AND" : "OR");
+        
+        if (val.endsWith(")")) {
+          comparator += ")";
+          val = val.replaceAll("\\s*\\)$", "");
+        }
+        
+        values.add(val);
+        
+        String andOr = group(6) == null ? "" : (group(6).equals("&&") ? "AND" : "OR");
         return String.format(startParam + " json_extract(value, ?) %s %s", comparator, andOr);
       }
     }.rewrite(filter);

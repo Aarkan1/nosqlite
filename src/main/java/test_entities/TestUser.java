@@ -3,7 +3,10 @@ package test_entities;
 import nosqlite.annotations.Id;
 import nosqlite.annotations.Document;
 
-//@Document
+import java.util.ArrayList;
+import java.util.List;
+
+@Document
 public class TestUser {
 
   @Id
@@ -12,7 +15,7 @@ public class TestUser {
   private String password;
   private int age;
 
-  private TestCat testCat;
+  private List<TestCat> testCats = new ArrayList<>();
 
   public TestUser() {
   }
@@ -27,11 +30,10 @@ public class TestUser {
     this.age = age;
   }
   
-  public TestUser(String username, String password, int age, TestCat testCat) {
+  public TestUser(String username, String password, int age) {
     this.username = username;
     this.password = password;
     this.age = age;
-    this.testCat = testCat;
   }
   
   public int getAge() {
@@ -41,13 +43,15 @@ public class TestUser {
   public void setAge(int age) {
     this.age = age;
   }
+  
+  public void addTestCat(TestCat testCat) { testCats.add(testCat); }
 
-  public TestCat getTestCat() {
-    return testCat;
+  public List<TestCat> getTestCats() {
+    return testCats;
   }
 
-  public void setTestCat(TestCat testCat) {
-    this.testCat = testCat;
+  public void setTestCats(List<TestCat> testCats) {
+    this.testCats = testCats;
   }
 
   public String getUid() {
@@ -81,7 +85,7 @@ public class TestUser {
         ", username='" + username + '\'' +
         ", password='" + password + '\'' +
         ", age=" + age +
-        ", testCat=" + testCat +
+        ", testCats=" + testCats +
         '}';
   }
 }

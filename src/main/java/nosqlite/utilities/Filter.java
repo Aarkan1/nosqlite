@@ -3,6 +3,9 @@ package nosqlite.utilities;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * @author Johan Wirén
+ */
 public abstract class Filter {
   public static String eq(String field, Object value) {
     return field + "=" + value;

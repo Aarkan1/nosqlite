@@ -2,6 +2,9 @@ package nosqlite.utilities;
 
 import java.util.regex.*;
 
+/**
+ * @author Johan Wirén
+ */
 public abstract class Rewriter {
   private Pattern pattern;
   private Matcher matcher;
