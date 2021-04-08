@@ -143,9 +143,10 @@ public class CollectionTest {
     assertEquals(collection(TestUser.class).find(lte("age", 20)).size(), 21);
 
 //  text
-    assertEquals(collection(TestUser.class).find("username=~user").size(), 100);
-    assertEquals(collection(TestUser.class).find("username=~er").size(), 100);
-    assertEquals(collection(TestUser.class).find(text("username","user")).size(), 100);
+    assertEquals(collection(TestUser.class).find("testCats[0].testRace.type=~Main%").size(), 50);
+    assertEquals(collection(TestUser.class).find("username=~user%").size(), 100);
+    assertEquals(collection(TestUser.class).find("username=~%er%").size(), 100);
+    assertEquals(collection(TestUser.class).find(text("username","user%")).size(), 100);
 
 //  regex
     assertEquals(collection(TestUser.class).find("username~~[0-3]$").size(), 40);

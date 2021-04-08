@@ -6,7 +6,7 @@ import nosqlite.annotations.Document;
 import java.util.ArrayList;
 import java.util.List;
 
-@Document
+//@Document
 public class TestUser {
 
   @Id

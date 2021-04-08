@@ -1,5 +1,6 @@
 # NoSQLite
 A single file NoSQL database utilizing SQLite JSON1 extension.
+
 It's a server-less embedded document database, ideal for small web applications.
 
 **It features:**
@@ -19,9 +20,12 @@ List<User> users = collection("User").find();  // get all users
 ```
 
 ## Table of content
-- [Getting started]()
+- [Installation](#installation)
+- [Getting started](#getting-started)
 - [CollectionConfig](#collectionconfig)
-- [document](#document)
+  - [Watcher](#watcher)
+  - [Browser](#browser)
+- [Document](#document)
 - [Collection methods](#collection-methods)
   - [Filters](#filters)
   - [FindOptions](#findoptions)
@@ -31,6 +35,42 @@ List<User> users = collection("User").find();  // get all users
 - [Export](#export)
 - [Drop](#drop)
   - [Important note](#important-note)
+
+## Installation
+### Download
+> Direct download as jar:
+
+[nosqlite-1.0.0.jar]()
+
+### Maven
+> Add repository:
+```xml
+<repository>
+    <id>jitpack.io</id>
+    <url>https://jitpack.io</url>
+</repository>
+```
+
+> Add dependency:
+```xml
+<dependency>
+    <groupId>com.github.Aarkan1</groupId>
+    <artifactId>nosqlite</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+### Gradle
+> Add this to your build.gradle
+```golang
+repositories {
+    maven { url "https://jitpack.io/" }
+}
+
+dependencies {
+    compile 'com.github.Aarkan1:nosqlite:1.0.0'
+}
+```
 
 ## Getting started
 Collections can be used with the static `collection()`-method to manipulate the database.
@@ -106,14 +146,14 @@ collection(option -> {
 });
 ```
 
-**useWatcher**
+#### Watcher
 
-This starts an `WebSocket` endpoint in the database that will send *watchData* when a change happens.
+**useWatcher** starts an `WebSocket` endpoint in the database that will send *watchData* when a change happens.
 
 **WatchData** is an object containing *model*, *event*, *data*.
 - *model*: The collection that were triggered
 - *event*: The event that was triggered, either 'insert', 'update' or 'delete'
-- *data*: List of items that are related to the change
+- *data*: List of documents that are related to the change
 
 To listen to these events on the client you have to create a WebSocket connection to `'ws://<hostname>:<port>/watch-collections'`.
 
@@ -175,9 +215,9 @@ ws.onmessage = messageEvent => {
 };
 ```
 
-**useBrowser**
+#### Browser
 
-This will enable the collection browser. This lets you peek at the stored data while developing. 
+**useBrowser** will enable the collection browser. This lets you peek at the stored data while developing. 
 It might be a good idea to disable this when deploying to save CPU and RAM.
 
 ```java
@@ -222,10 +262,10 @@ Data is stored in the collection as JSON, and the `find()`-methods parse this JS
 | --- | --- | --- |
 | Get all documents | find(Filter) | Returns a list with objects. If no filter is used find() will return ALL documents. |
 | Get one document | findOne(Filter) | Returns first found document. |
-| Get document with id | findById(id) | Returns the object with mathing id. |
-| Get all documents | findAsJson(Filter) | Returns a list with objects as JSON. If no filter is used find() will return ALL documents. |
-| Get one document | findOneAsJson(Filter) | Returns first found document as JSON. |
-| Get document with id | findByIdAsJson(id) | Returns the object with mathing id as JSON. |
+| Get document with id | findById(id) | Returns the object with matching id. |
+| Get all documents as JSON | findAsJson(Filter) | Returns a list with objects as JSON. If no filter is used find() will return ALL documents. |
+| Get one document as JSON | findOneAsJson(Filter) | Returns first found document as JSON. |
+| Get document with id as JSON | findByIdAsJson(id) | Returns the object with matching id as JSON. |
 | Create or Update a document | save(Object) | Creates a new document in the collection if no id is present. If theres an id save() will update the existing document in the collection. Can save an array of documents. |
 | Update documents | updateField(fieldName, newValue) | Update all documents fields with new value. |
 | Update a document field with Object | updateField(Object, fieldName, newValue) | Updates the document field with matching id. |
@@ -239,8 +279,25 @@ Data is stored in the collection as JSON, and the `find()`-methods parse this JS
 | Watch a collection | watch(lambda) | Register a watcher that triggers on changes in the collection. |
 | Watch a collection on an event | watch(event, lambda) | Register a watcher that triggers on changes at target event in the collection. |
 
+**Table 1.2. Collection as a key/value store methods**
 
-### Filter
+When using the collection as a key/value store you can name the collection anything you want.
+```java
+collection("pets").put("snuggles", new Cat("Snuggles"));
+collection("pets").put("pluto", new Dog("Pluto"));
+
+Dog pluto = collection("pets").get("pluto", Dog.class);
+```
+
+| Operation | Method | Description |
+| --- | --- | --- |
+| Get value by key | get(key) | Returns an object as JSON. |
+| Get value by key as a POJO | get(key, class) | Returns an object parsed to target class. |
+| Store object at key | put(key, value) | Stores the value as JSON at target key. Replaces value if key exists. |
+| Store object at key | putIfAbsent(key, value) | Stores the value as JSON at target key. Does not replace value if key exists. |
+| Remove value by key | remove(key) | Removes both key and value. |
+
+### Filters
 
 Filter are the selectors in the collection’s find operation. It matches documents in the collection depending on the criteria provided and returns a list of objects.
 
@@ -280,7 +337,7 @@ import static nosqlite.utilities.Filter.*;
 ### FindOptions
 
 A FindOptions is used to specify search options. It provides pagination as well as sorting mechanism.
-The config syntax with lambda is a lot more clear and easier to digest.
+The config syntax with lambda is more clear and easier to read.
 
 Example
 ```java
@@ -404,23 +461,33 @@ collection("User").find("age==[20, 30, 40]");
 
 
 **text()**
+Same rules as [SQL LIKE](https://www.w3schools.com/sql/sql_like.asp)
+* The percent sign (%) represents zero, one, or multiple characters
+* The underscore sign (_) represents one, single character
 ```java
-// matches all documents where 'address' field has a word that contains a text 'oa'.
-collection("User").find(text("address", "oa"));
-// with the statement syntax
-collection("User").find("address=~oa");
+// matches all documents where 'address' field start with "a"
+collection("User").find(text("address", "a%"));
 
-// matches all documents where 'address' field has word that starts with '11A'.
-collection("User").find(text("address", "11a%"));
+// with the statement syntax, applies to all text() examples
+collection("User").find("address=~a%");
 
-// matches all documents where 'address' field has a word that ends with 'Road'.
-collection("User").find(text("address", "%road"));
+// matches all documents where 'address' field end with "a"
+collection("User").find(text("address", "%a"));
 
-// matches all documents where 'address' field has words like '11a' and 'road'.
-collection("User").find(text("address", "11a road"));
+// matches all documents where 'address' field have "or" in any position
+collection("User").find(text("address", "%or%"));
 
-// matches all documents where 'address' field has word 'road' and another word that start with '11a'.
-collection("User").find(text("address", "11a% road"));
+// matches all documents where 'address' field have "r" in the second position
+collection("User").find(text("address", "_r%"));
+
+// matches all documents where 'address' field start with "a" and are at least 2 characters in length
+collection("User").find(text("address", "a_%"));
+
+// matches all documents where 'address' field start with "a" and are at least 3 characters in length
+collection("User").find(text("address", "'a__%"));
+
+// matches all documents where 'address' field start with "a" and ends with "o"
+collection("User").find(text("address", "a%o"));
 ```
 
 **regex()**

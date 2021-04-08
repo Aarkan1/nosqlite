@@ -25,6 +25,7 @@ class DbHelper {
   private final Map<String, Map<String, List<WatchHandler>>> eventWatchers = new HashMap<>();
   private AtomicBoolean isRunning = new AtomicBoolean(true);
   private boolean runAsync;
+  private boolean useRegex;
   private final ObjectMapper mapper = new ObjectMapper();
   ThreadPoolExecutor watchExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(5);
   
@@ -58,6 +59,7 @@ class DbHelper {
   DbHelper(Connection conn, boolean useRegex, boolean runAsync) throws SQLException {
     this.conn = conn;
     this.runAsync = runAsync;
+    this.useRegex = useRegex;
     if (useRegex) addRegex(conn);
     
     if (runAsync) {
@@ -218,6 +220,7 @@ class DbHelper {
   
   private <T> String queryMany(String query, Object[] documents, Class<T> coll, String collName) {
     List<String> docs = new ArrayList<>();
+    StringBuilder jsonDocs = new StringBuilder("[");
     try {
       conn.setAutoCommit(false);
       PreparedStatement stmt = conn.prepareStatement(query);
@@ -226,6 +229,7 @@ class DbHelper {
         Map<String, String> field = Utils.getIdField(model);
         String json = mapper.writeValueAsString(model);
         docs.add(json);
+        jsonDocs.append(json);
         
         stmt.setString(1, field.get("id"));
         stmt.setString(2, json);
@@ -239,7 +243,8 @@ class DbHelper {
       if (eventWatchers.get(collName) != null || watchers.get(collName) != null) {
         updateWatchers(collName, "insert", docs.toString(), coll);
       }
-      return mapper.writeValueAsString(docs);
+      jsonDocs.append("]");
+      return jsonDocs.toString();
     } catch (SQLException | JsonProcessingException e) {
       e.printStackTrace();
     } finally {
@@ -450,7 +455,6 @@ class DbHelper {
   Map<String, List<String>> generateWhereClause(String filter) {
     List<String> paths = new ArrayList<>();
     List<String> values = new ArrayList<>();
-    boolean useRegex = true;
     
     String regex = useRegex ? "(\\s*\\!\\s*)?([\\(\\w\\s\\.\\[\\]]+)\\s*(~~|=~|==|>=|<=|!=|<|>|=)\\s*(([%\\-,\\^_\\w\\.\\[\\]\\(\\)\\?\\>\\<\\:\\=\\{\\}\\+\\*\\$\\\\\\/]*\\|{0,1}[%\\-,\\^_\\w\\s\\.\\[\\]\\(\\)\\?\\>\\<\\:\\=\\{\\}\\+\\*\\$\\\\\\/])*(?<!\\|))\\)?(&&|\\|\\|)?"
         : "(\\s*\\!\\s*)?([\\(\\w\\s\\.\\[\\]]+)\\s*(=~|==|>=|<=|!=|<|>|=)\\s*([%\\-,\\_\\w\\s\\.\\[\\]!?]*)\\)?(&&|\\|\\|)?";
@@ -483,20 +487,13 @@ class DbHelper {
           for (String in : inValues) {
             comparator += "?,";
           }
-          values.add(val);
           comparator = comparator.replaceAll(",$", ")");
-        } else {
-          comparator = group(3) + " ?";
-        }
-        if (group(3).equals("=~")) {
+        } else if (group(3).equals("=~")) {
           comparator = "LIKE ?";
-          if (val.contains("%") || val.contains("_")) {
-            values.add(val);
-          } else {
-            values.add("%" + val + "%");
-          }
         } else if (useRegex && group(3).equals("~~")) {
           comparator = "REGEXP ?";
+        } else {
+          comparator = group(3) + " ?";
         }
         
         if (val.endsWith(")")) {
