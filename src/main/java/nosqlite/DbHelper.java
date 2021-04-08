@@ -220,7 +220,8 @@ class DbHelper {
   
   private <T> String queryMany(String query, Object[] documents, Class<T> coll, String collName) {
     List<String> docs = new ArrayList<>();
-    StringBuilder jsonDocs = new StringBuilder("[");
+    List<String> jsonDocs = new ArrayList<>();
+    
     try {
       conn.setAutoCommit(false);
       PreparedStatement stmt = conn.prepareStatement(query);
@@ -229,7 +230,7 @@ class DbHelper {
         Map<String, String> field = Utils.getIdField(model);
         String json = mapper.writeValueAsString(model);
         docs.add(json);
-        jsonDocs.append(json);
+        jsonDocs.add(json);
         
         stmt.setString(1, field.get("id"));
         stmt.setString(2, json);
@@ -243,8 +244,8 @@ class DbHelper {
       if (eventWatchers.get(collName) != null || watchers.get(collName) != null) {
         updateWatchers(collName, "insert", docs.toString(), coll);
       }
-      jsonDocs.append("]");
-      return jsonDocs.toString();
+      
+      return "[" + String.join(",", jsonDocs) + "]";
     } catch (SQLException | JsonProcessingException e) {
       e.printStackTrace();
     } finally {
