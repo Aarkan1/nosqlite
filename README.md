@@ -40,7 +40,7 @@ List<User> users = collection("User").find();  // get all users
 ### Download
 > Direct download as jar:
 
-[nosqlite-1.0.0.jar]()
+[nosqlite-1.0.0.jar](https://github.com/Aarkan1/nosqlite/releases/download/1.0.0/nosqlite-1.0.0.jar)
 
 ### Maven
 > Add repository:
