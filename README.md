@@ -44,6 +44,7 @@ List<User> users = collection("User").find();  // get all users
 
 ### Maven
 > Add repository:
+
 ```xml
 <repository>
     <id>jitpack.io</id>
@@ -52,6 +53,7 @@ List<User> users = collection("User").find();  // get all users
 ```
 
 > Add dependency:
+
 ```xml
 <dependency>
     <groupId>com.github.Aarkan1</groupId>
@@ -62,6 +64,7 @@ List<User> users = collection("User").find();  // get all users
 
 ### Gradle
 > Add this to your build.gradle
+
 ```golang
 repositories {
     maven { url "https://jitpack.io/" }
@@ -464,6 +467,7 @@ collection("User").find("age==[20, 30, 40]");
 Same rules as [SQL LIKE](https://www.w3schools.com/sql/sql_like.asp)
 * The percent sign (%) represents zero, one, or multiple characters
 * The underscore sign (_) represents one, single character
+
 ```java
 // matches all documents where 'address' field start with "a"
 collection("User").find(text("address", "a%"));
