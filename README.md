@@ -1,7 +1,7 @@
 # NoSQLite
 A single file NoSQL database utilizing SQLite JSON1 extension.
 
-It's a server-less embedded document database, ideal for small web applications.
+It's a lightweight embedded document database, ideal for small web applications.
 
 **It features:**
 - Embedded key-value object store
