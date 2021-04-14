@@ -28,6 +28,7 @@ List<MyCustomUser> users = collection("MyCustomUser").find();  // get all users
 - [Document](#document)
 - [Observe collection](#observe-collection)
 - [Collection methods](#collection-methods)
+  - [List all collections](#list-all-collections)
   - [Filters](#filters)
   - [FindOptions](#findoptions)
 - [Collection Examples](#collection-examples)
@@ -226,6 +227,16 @@ Dog pluto = collection("pets").get("pluto", Dog.class);
 | Store object at key | put(key, value) | Stores the value as JSON at target key. Replaces value if key exists. |
 | Store object at key | putIfAbsent(key, value) | Stores the value as JSON at target key. Does not replace value if key exists. |
 | Remove value by key | remove(key) | Removes both key and value. |
+
+
+### List all collections
+The static method `collectionNames()` returns a list of all different collections currently stored.
+
+```java
+import static nosqlite.Database.collectionNames;
+
+List<String> collections = collectionNames();
+```
 
 ### Filters
 
