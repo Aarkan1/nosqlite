@@ -272,7 +272,6 @@ class DbHelper {
           (limit == 0 ? ")" : " LIMIT %2$d OFFSET %3$d)"), collName, limit, offset));
     }
     
-    // TODO: sort is slow on large datasets
     String orderBy = "";
     String[] order = new String[2];
     if (sort != null) {
@@ -283,7 +282,7 @@ class DbHelper {
         order[0] = "$." + sort.substring(0, sort.length() - 1);
         order[1] = "DESC";
       } else {
-        order = sort.split("=|==");
+        order = sort.split("==|=");
         order[0] = "$." + order[0];
       }
       orderBy = " ORDER BY json_extract(value, ?) " + order[1];

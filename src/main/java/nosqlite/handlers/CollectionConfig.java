@@ -5,8 +5,9 @@ package nosqlite.handlers;
  */
 public class CollectionConfig {
   // default values
+  public String dbPath = "db/data.db";
   public boolean runAsync = true;
   public boolean useBrowser = false;
   public boolean useWatcher = false;
-  public String dbPath = "db/data.db";
+  public boolean runTestSuite = false;
 }

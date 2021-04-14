@@ -13,24 +13,28 @@ It's a lightweight embedded document database, ideal for small web applications.
 ```java
 import static nosqlite.Database.collection;
 
-User john = new User("John");
-collection("User").save(john);  // create or update user
+MyCustomUser john = new MyCustomUser("John");
 
-List<User> users = collection("User").find();  // get all users
+// save john to the MyCustomUser-collection
+collection("MyCustomUser").save(john);      // select collection with class name
+collection(MyCustomUser.class).save(john);  // select collection with class
+
+List<MyCustomUser> users = collection("MyCustomUser").find();  // get all users
 ```
 
 ## Table of content
 - [Installation](#installation)
 - [Getting started](#getting-started)
-- [CollectionConfig](#collectionconfig)
-  - [Watcher](#watcher)
-  - [Browser](#browser)
 - [Document](#document)
+- [Observe collection](#observe-collection)
 - [Collection methods](#collection-methods)
   - [Filters](#filters)
   - [FindOptions](#findoptions)
 - [Collection Examples](#collection-examples)
 - [Filter nested objects](#filter-nested-objects)
+- [CollectionConfig](#collectionconfig)
+  - [Watcher](#watcher) (requires [Java Express](https://github.com/Aarkan1/java-express))
+  - [Browser](#browser) (requires [Java Express](https://github.com/Aarkan1/java-express))
 - [Import](#import)
 - [Export](#export)
 - [Drop](#drop)
@@ -77,156 +81,35 @@ dependencies {
 
 ## Getting started
 Collections can be used with the static `collection()`-method to manipulate the database.
-**collection()** takes either a String with the classname, case sensitive, or the Class itself.
+**collection()** takes either a String with the class name, case sensitive, or the Class itself.
 This will create a database-file in your project. Easy to deploy or share. 
 
+### Examples
 ```java
 import static nosqlite.Database.collection;
 
-// creates a database-file in /db-folder called 'data.db'
-User john = new User("John");
-// generates an UUID
-collection("User").save(john); 
+MyCustomUser john = new MyCustomUser("John");
 
-User jane = collection("User").findById("lic4XCz2kxSOn4vr0D8BV");
+// generates an UUID like: "lic4XCz2kxSOn4vr0D8BV"
+collection("MyCustomUser").save(john);     // select collection with class name
+collection(MyCustomUser.class).save(john); // select collection with class
+
+MyCustomUser jane = collection("MyCustomUser").findById("lic4XCz2kxSOn4vr0D8BV");
 
 jane.setAge(30);
+
 // updates document with same UUID
-collection("User").save(jane); 
+collection("MyCustomUser").save(jane); 
 
 // delete Jane
-collection("User").deleteById("lic4XCz2kxSOn4vr0D8BV"); 
+collection("MyCustomUser").deleteById("lic4XCz2kxSOn4vr0D8BV"); 
 
-List<User> users = collection("User").find();
-List<User> users = collection(User.class).find();
+List<MyCustomUser> users = collection("MyCustomUser").find(); // get all users
 
-List<User> usersNamedJohn = collection("User").find(eq("name", "John"));
+List<MyCustomUser> usersNamedJohn = collection("MyCustomUser").find(eq("name", "John"));
 
 // or with the statement syntax
-List<User> usersNamedJohn = collection("User").find("name==John"); 
-```
-
-Watch a collection on changes
-```java
-// watchData has 3 fields. 
-// model - is the document class that was triggered 
-// event - is the event triggered - 'insert', 'update' or 'delete'
-// data - is a list with effected documents
-collection("User").watch(watchData -> {
-    List<User> effectedUsers = (List<User>) watchData.data;
-
-    switch(watchData.event) {
-        case "insert": // on created document
-        break;
-
-        case "update": // on updated document
-        break;
-
-        case "delete": // on deleted document
-        break;
-    }
-});
-```
-
-### CollectionConfig
-CollectionConfig can be passed when enabling collections to set certain options.
-Options available are:
-- *dbPath* - The default path is "db/data.db". You can override that with this option. 
-- *runAsync* - Enables threaded async calls to the database.
-- *useWatcher* - Enable WebSocket listener on collection changes. With *runAsync* this triggers on a different thread.
-- *useBrowser* - Enable collection browser (good when developing)
-
-**Note:** options must be called before any other call with collection()! 
-
-You can pass one or multiple options when enabling collections:
-```java
-// default options 
-collection(option -> {
-    option.dbPath = "db/data.db";
-    option.runAsync = true; 
-    option.useWatcher = false;
-    option.useBrowser = false; 
-});
-```
-
-#### Watcher
-
-**useWatcher** starts an `WebSocket` endpoint in the database that will send *watchData* when a change happens.
-
-**WatchData** is an object containing *model*, *event*, *data*.
-- *model*: The collection that were triggered
-- *event*: The event that was triggered, either 'insert', 'update' or 'delete'
-- *data*: List of documents that are related to the change
-
-To listen to these events on the client you have to create a WebSocket connection to `'ws://<hostname>:<port>/watch-collections'`.
-
-```js
-let ws = new WebSocket('ws://localhost:4000/watch-collections')
-```
-
-With the webSocket you can listen to messages from the collection channel.
-
-```js
-ws.onmessage = messageEvent => {
-    const watchData = JSON.parse(messageEvent.data);
-
-    // deconstruct model, event and data from watchData
-    const { model, event, data } = watchData;
-
-    if(model == 'BlogPost') {
-        // do something with BlogPost
-    } 
-    else if(model == 'Message') {
-        // do something with Message
-    }
-};
-```
-
-#### Example
-
-Java:
-```java
-collection(option -> {
-    option.useWatcher = true;
-}); 
-```
-
-JavaScript:
-```js
-ws.onmessage = messageEvent => {
-    const watchData = JSON.parse(messageEvent.data);
-
-    // deconstruct model, event and data from watchData
-    const { model, event, data } = watchData;
-
-    switch(event) {
-        case 'insert':
-            // add post to list
-            model == 'BlogPost' && posts.push(data[0]);
-            model == 'Message' && // add message to list
-        break;
-        case 'update':
-        break;
-        case 'delete':
-            // remove post from list
-            model == 'BlogPost' && (posts = posts.filter(post => post.id !== data[0].id));
-        break;
-    };
-
-    // update 
-    renderPosts();
-};
-```
-
-#### Browser
-
-**useBrowser** will enable the collection browser. This lets you peek at the stored data while developing. 
-It might be a good idea to disable this when deploying to save CPU and RAM.
-
-```java
-collection(option -> {
-    option.useBrowser = true; 
-});
+List<MyCustomUser> usersNamedJohn = collection("MyCustomUser").find("name==John"); 
 ```
 
 ## Document
@@ -251,6 +134,50 @@ public class MyType {
     private String id;
     private String name;
 }
+```
+
+## Observe collection
+
+You can register a watcher to a collection. The watcher listens on changes to that collection, and automatically triggers provided handler.
+
+Watch a collection on changes:
+```java
+// watchData has 3 fields. 
+// model - is the document class that was triggered 
+// event - is the event triggered - 'insert', 'update' or 'delete'
+// data - is a list with effected documents
+collection("MyCustomUser").watch(watchData -> {
+    List<MyCustomUser> effectedUsers = (List<MyCustomUser>) watchData.data;
+
+    switch(watchData.event) {
+        case "insert": // on created document
+        break;
+
+        case "update": // on updated document
+        break;
+
+        case "delete": // on deleted document
+        break;
+    }
+});
+```
+
+Watch a collection on changes on a specific event:
+```java
+collection("MyCustomUser").watch("insert", watchData -> {
+    List<MyCustomUser> effectedUsers = (List<MyCustomUser>) watchData.data;
+    // do logic with inserted documents
+});
+
+collection("MyCustomUser").watch("update", watchData -> {
+    List<MyCustomUser> effectedUsers = (List<MyCustomUser>) watchData.data;
+    // do logic with updated documents
+});
+
+collection("MyCustomUser").watch("delete", watchData -> {
+    List<MyCustomUser> effectedUsers = (List<MyCustomUser>) watchData.data;
+    // do logic with deleted documents
+});
 ```
 
 ## Collection methods
@@ -334,7 +261,7 @@ import static nosqlite.utilities.Filter.*;
 
 | Filter | Method | Description |
 | --- | --- | --- |
-| Text | text(String, String) | Performs full-text search. Same rules as [SQL LIKE](https://www.w3schools.com/sql/sql_like.asp) |
+| Text | text(String, String) | Performs full-text search. Same syntax as [SQL LIKE](https://www.w3schools.com/sql/sql_like.asp) |
 | Regex | regex(String, String) | Selects documents where values match a specified regular expression. |
 
 ### FindOptions
@@ -353,15 +280,17 @@ List<User> users = collection("User").find(op -> {
         op.limit = 10;
     });
 ```
+
 ```java
-// sorts the documents by age in ascending order
-List<User> users = collection("User").find(null, "age=asc", 0, 0);
+// sorts the documents by age in descending order
+List<User> users = collection("User").find(null, "age=desc", 0, 0);
 
 // or with FindOptions
 List<User> users = collection("User").find(op -> {
-        op.filter = "age=asc";
+        op.filter = "age=desc";
     });
 ```
+
 ```java
 // fetch 10 documents starting from offset = 2
 List<User> users = collection("User").find(10, 2);
@@ -464,7 +393,7 @@ collection("User").find("age==[20, 30, 40]");
 
 
 **text()**
-Same rules as [SQL LIKE](https://www.w3schools.com/sql/sql_like.asp)
+Same syntax as [SQL LIKE](https://www.w3schools.com/sql/sql_like.asp)
 * The percent sign (%) represents zero, one, or multiple characters
 * The underscore sign (_) represents one, single character
 
@@ -516,6 +445,122 @@ collection("User").find("cat.age==7");
 collection("User").find(eq("accessory.headphones.brand", "Bose"));
 // with the statement syntax
 collection("User").find("accessory.headphones.brand==Bose");
+```
+
+### CollectionConfig
+CollectionConfig can be passed when enabling collections to set certain options.
+Options available are:
+- *dbPath* - The default path is "db/data.db". You can override that with this option. 
+- *runAsync* - Enables threaded async calls to the database.
+- *useWatcher* - Enable WebSocket listener on collection changes. With *runAsync* this triggers on a different thread.
+- *useBrowser* - Enable collection browser (good when developing)
+
+**Note:** options must be called before any other call with collection()! 
+
+You can pass one or multiple options when enabling collections:
+```java
+// default options 
+CollectionConfig config = new CollectionConfig();
+config.dbPath = "db/data.db";
+config.runAsync = true; 
+config.useWatcher = false;
+config.useBrowser = false; 
+
+collection(config);
+```
+
+Or with lambda syntax:
+```java
+collection(config -> {
+    config.dbPath = "db/data.db";
+    config.runAsync = true; 
+    config.useWatcher = false;
+    config.useBrowser = false; 
+});
+```
+
+#### Watcher
+
+This part requires [Java Express](https://github.com/Aarkan1/java-express)!
+
+**useWatcher** starts an `WebSocket` endpoint in the database that will send *watchData* when a change happens.
+
+**WatchData** is an object containing *model*, *event*, *data*.
+- *model*: The collection that were triggered
+- *event*: The event that was triggered, either 'insert', 'update' or 'delete'
+- *data*: List of documents that are related to the change
+
+To listen to these events on the client you have to create a WebSocket connection to `'ws://<hostname>:<port>/watch-collections'`.
+
+```js
+let ws = new WebSocket('ws://localhost:4000/watch-collections')
+```
+
+With the webSocket you can listen to messages from the collection channel.
+
+```js
+ws.onmessage = messageEvent => {
+    const watchData = JSON.parse(messageEvent.data);
+
+    // deconstruct model, event and data from watchData
+    const { model, event, data } = watchData;
+
+    if(model == 'BlogPost') {
+        // do something with BlogPost
+    } 
+    else if(model == 'Message') {
+        // do something with Message
+    }
+};
+```
+
+#### Example
+
+Java:
+```java
+collection(config -> {
+    config.useWatcher = true;
+}); 
+```
+
+JavaScript:
+```js
+ws.onmessage = messageEvent => {
+    const watchData = JSON.parse(messageEvent.data);
+
+    // deconstruct model, event and data from watchData
+    const { model, event, data } = watchData;
+
+    switch(event) {
+        case 'insert':
+            // add post to list
+            model == 'BlogPost' && posts.push(data[0]);
+            model == 'Message' && // add message to list
+        break;
+        case 'update':
+        break;
+        case 'delete':
+            // remove post from list
+            model == 'BlogPost' && (posts = posts.filter(post => post.id !== data[0].id));
+        break;
+    };
+
+    // update 
+    renderPosts();
+};
+```
+
+#### Browser
+
+This part requires [Java Express](https://github.com/Aarkan1/java-express)!
+
+**useBrowser** will enable the collection browser. This lets you peek at the stored data while developing. 
+It might be a good idea to disable this when deploying to save CPU and RAM.
+
+```java
+collection(config -> {
+    config.useBrowser = true; 
+});
 ```
 
 ## Import

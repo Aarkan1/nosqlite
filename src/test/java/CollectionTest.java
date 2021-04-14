@@ -25,10 +25,11 @@ public class CollectionTest {
   @BeforeAll
   public static void setup() {
     // init collections to memory
-    collection(op -> {
-//      op.dbPath = "db/test.db";
-      op.dbPath = ":memory:";
-//      op.runAsync = false;
+    collection(config -> {
+//      config.runAsync = false;
+//      config.dbPath = "db/test.db";
+      config.dbPath = ":memory:";
+      config.runTestSuite = true;
     });
   }
   
