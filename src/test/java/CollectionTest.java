@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static nosqlite.Database.collection;
+import static nosqlite.Database.collectionNames;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static nosqlite.utilities.Filter.*;
@@ -42,9 +43,12 @@ public class CollectionTest {
   
   @AfterAll
   public static void tearAll() {
+    System.out.println(collectionNames());
+  
     // stop collection threads
     collection(TestUser.class).close();
     collection(TestCat.class).close();
+    collection("map").close();
   
     File testdb = new File("db/test.db");
     testdb.delete();

@@ -17,7 +17,6 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class Database {
   private static Map<String, Collection> collections = new ConcurrentHashMap<>();
-  private static Set<String> collectionNames = new HashSet<>();
   private static Connection conn;
   private static DbHelper dbHelper = null;
   private static Database singleton = null;
@@ -55,12 +54,15 @@ public class Database {
         String name = k.getAnnotation(Document.class).collection();
         name = name.equals("_default_coll") ? k.getSimpleName() : name;
         collections.putIfAbsent(name, new Collection(dbHelper, k, name));
-        collectionNames.add(name);
       }
     }
   }
   
-  public static List<String> collectionNames() { return new ArrayList<>(collectionNames); }
+  public static List<String> collectionNames() {
+    String tablesQuery = dbHelper.get("SELECT GROUP_CONCAT(name) FROM sqlite_master WHERE type='table'");
+    String[] tables = tablesQuery.split(",");
+    return Arrays.asList(tables);
+  }
 
   public static Collection collection(Class klass) { return collection(klass.getSimpleName()); }
   
@@ -72,7 +74,6 @@ public class Database {
     if(coll == null) {
       coll = new Collection(dbHelper,null, doc);
       collections.put(doc, coll);
-      collectionNames.add(doc);
     }
     return coll;
   }
