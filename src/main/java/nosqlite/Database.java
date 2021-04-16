@@ -20,8 +20,8 @@ public class Database {
   private static Connection conn;
   private static DbHelper dbHelper = null;
   private static Database singleton = null;
-  private static boolean runAsync = true;
   
+  public static boolean runAsync = true;
   public static boolean useBrowser = false;
   public static boolean useWatchers = false;
   public static boolean runTestSuite = false;
