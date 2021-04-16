@@ -66,6 +66,7 @@ public class CollectionTest {
   
   @Test
   public void testPut() {
+    collection("map").put("key2", "{\"id\":null,\"name\":\"Tyson\",\"color\":\"Gray\",\"owner\":null,\"age\":0,\"testRace\":null}");
     assertEquals(collection("map").put("key", "value"), "\"value\"");
     assertEquals(collection("map").put("key", "test"), "\"test\"");
     assertEquals(collection("map").put("key", 10), "10");

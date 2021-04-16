@@ -84,10 +84,20 @@ public class Collection {
   
   public String put(String key, Object value) {
     boolean exists = get(key) != null;
-    String json = JSONstringify(value);
-    String query = String.format("INSERT INTO %s values(?, json(?)) " +
+    boolean isJson = false;
+  
+    if (value instanceof String) {
+      Object[] params = {value};
+      isJson = db.get("SELECT json_valid(?)", params).equals("1");
+    }
+    
+    if(!isJson) {
+      value = JSONstringify(value);
+    }
+    
+    String query = String.format("INSERT INTO %s values(?, json(?))" +
         "ON CONFLICT(key) DO UPDATE SET value=json(excluded.value)", collName);
-    Object[] params = {key, json};
+    Object[] params = {key, value};
     return db.run(exists ? "insert" : "update", query, params, klass, collName);
   }
   
@@ -95,10 +105,7 @@ public class Collection {
     boolean exists = get(key) != null;
     if (exists) return '\'' + key + "' already exists";
     
-    String json = JSONstringify(value);
-    String query = String.format("INSERT INTO %s values(?, json(?))", collName);
-    Object[] params = {key, json};
-    return db.run("insert", query, params, klass, collName);
+    return put(key, value);
   }
   
   public String remove(String key) {
