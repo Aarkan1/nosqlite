@@ -166,7 +166,7 @@ public class Collection {
   
     boolean isJson = false;
     
-    if (documents[0] instanceof String) {
+    if (documents instanceof String[] || documents[0] instanceof String) {
       Object[] params = {documents[0]};
       isJson = db.get("SELECT json_valid(?)", params).equals("1");
     }
