@@ -162,6 +162,10 @@ public class Collection {
   }
   
   public <T> T[] save(Object[] documents) {
+    return saveMany(documents);
+  }
+  
+  public <T> T[] saveMany(Object[] documents) {
     if (documents == null) throw new NullPointerException();
   
     boolean isJson = false;
