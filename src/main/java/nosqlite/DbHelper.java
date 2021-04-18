@@ -8,6 +8,7 @@ import org.sqlite.Function;
 import nosqlite.utilities.Rewriter;
 import nosqlite.utilities.Utils;
 
+import java.lang.reflect.InvocationTargetException;
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -222,19 +223,48 @@ class DbHelper {
     List<String> docs = new ArrayList<>();
     List<String> jsonDocs = new ArrayList<>();
     
+    boolean isJson = false;
+    
+    if (documents[0] instanceof String) {
+      Object[] params = {documents[0]};
+      isJson = get("SELECT json_valid(?)", params).equals("1");
+    }
+    
     try {
       conn.setAutoCommit(false);
       PreparedStatement stmt = conn.prepareStatement(query);
       
-      for (Object model : documents) {
-        Map<String, String> field = Utils.getIdField(model);
-        String json = mapper.writeValueAsString(model);
-        docs.add(json);
-        jsonDocs.add(json);
-        
-        stmt.setString(1, field.get("id"));
-        stmt.setString(2, json);
-        stmt.executeUpdate();
+      if(isJson) {
+        for (Object model : documents) {
+          String json = (String) model;
+          String idField = "_id";
+          
+          if(coll != null) try {
+            idField = Utils.getIdField(coll.getClass().getDeclaredConstructor().newInstance()).get("name");
+          } catch (InstantiationException | NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
+            e.printStackTrace();
+          }
+          
+          Object[] jsonParams = {json, "$." + idField};
+          String jsonId = get("SELECT json_extract(json(?), ?)", jsonParams);
+          docs.add(json);
+          jsonDocs.add(json);
+    
+          stmt.setString(1, jsonId);
+          stmt.setString(2, json);
+          stmt.executeUpdate();
+        }
+      } else {
+        for (Object model : documents) {
+          Map<String, String> field = Utils.getIdField(model);
+          String json = mapper.writeValueAsString(model);
+          docs.add(json);
+          jsonDocs.add(json);
+          
+          stmt.setString(1, field.get("id"));
+          stmt.setString(2, json);
+          stmt.executeUpdate();
+        }
       }
       
       conn.commit();

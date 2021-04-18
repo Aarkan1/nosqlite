@@ -30,7 +30,9 @@ public class Collection {
     this.db = db;
     this.collName = collName;
     
-    if (klass != null) {
+    if (klass == null) {
+      idField = "_id";
+    } else {
       for (Field field : klass.getDeclaredFields()) {
         if (field.isAnnotationPresent(Id.class)) {
           idField = field.getName();
@@ -120,7 +122,7 @@ public class Collection {
     String jsonId = db.get("SELECT json_extract(json(?), ?)", jsonParams);
     
     if (jsonId == null) {
-      Map<String, String> field = getIdField();
+      Map<String, String> field = klass == null ? getIdField(new HashMap<>()) : getIdField();
       jsonId = field.get("id");
     }
     String exists = get(jsonId);
@@ -161,14 +163,24 @@ public class Collection {
   
   public <T> T[] save(Object[] documents) {
     if (documents == null) throw new NullPointerException();
-    for (Object doc : documents) {
-      if (doc == null) throw new NullPointerException();
-      
-      if (doc.getClass() != klass) try {
-        throw new TypeMismatchException(String.format("'%s' cannot be saved in a '%s' collection", documents[0].getClass().getSimpleName(), collName));
-      } catch (TypeMismatchException e) {
-        e.printStackTrace();
-        return null;
+  
+    boolean isJson = false;
+    
+    if (documents[0] instanceof String) {
+      Object[] params = {documents[0]};
+      isJson = db.get("SELECT json_valid(?)", params).equals("1");
+    }
+    
+    if(!isJson) {
+      for (Object doc : documents) {
+        if (doc == null) throw new NullPointerException();
+        
+        if (doc.getClass() != klass) try {
+          throw new TypeMismatchException(String.format("'%s' cannot be saved in a '%s' collection", documents[0].getClass().getSimpleName(), collName));
+        } catch (TypeMismatchException e) {
+          e.printStackTrace();
+          return null;
+        }
       }
     }
     
@@ -422,6 +434,12 @@ public class Collection {
   
   private Map<String, String> getIdField(Object model) {
     Map<String, String> idValues = new HashMap<>();
+  
+    if(model instanceof Map) {
+      idValues.put("name", "_id");
+      idValues.put("id", NanoIdUtils.randomNanoId());
+      return idValues;
+    }
     
     if (idField != null) {
       try {

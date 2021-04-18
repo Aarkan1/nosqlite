@@ -99,6 +99,12 @@ public abstract class Utils {
 
   public static Map<String, String> getIdField(Object model) {
     Map<String, String> idValues = new HashMap<>();
+    
+    if(model instanceof Map) {
+      idValues.put("name", "_id");
+      idValues.put("id", NanoIdUtils.randomNanoId());
+      return idValues;
+    }
 
     try {
       for (Field field : model.getClass().getDeclaredFields()) {
