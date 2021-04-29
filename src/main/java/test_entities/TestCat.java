@@ -2,6 +2,7 @@ package test_entities;
 
 import nosqlite.annotations.Document;
 import nosqlite.annotations.Id;
+import nosqlite.annotations.Transient;
 
 @Document
 public class TestCat {
@@ -9,6 +10,8 @@ public class TestCat {
   @Id
   private String id;
   private String name;
+  
+  @Transient
   private String color;
   private String owner;
   private int age;
