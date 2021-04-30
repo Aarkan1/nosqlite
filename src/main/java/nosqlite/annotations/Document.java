@@ -11,5 +11,5 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface Document {
-  String collection() default "_default_coll";
+  String collection() default "default_coll";
 }

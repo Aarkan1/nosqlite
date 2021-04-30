@@ -43,8 +43,6 @@ public class CollectionTest {
   
   @AfterAll
   public static void tearAll() {
-    System.out.println(collectionNames());
-  
     // stop collection threads
     collection(TestUser.class).close();
     collection(TestCat.class).close();
@@ -97,17 +95,28 @@ public class CollectionTest {
   
   @Test
   public void testRemove() {}
-  
+
+  @Disabled
   @Test
   public void testFindOptions() {
     testSaveList();
-  
-//    System.out.println(collection(TestUser.class).find(op -> {
-//      op.filter = "testCats[0].testRace.type==Main Coon";
-//      op.limit = 10;
-//      op.offset = 10;
-//      op.sort = "uid=asc";
-//    }));
+    collection();
+
+    long start = System.currentTimeMillis();
+    System.out.println(collectionNames());
+    System.out.println("collectionNames() in " + (System.currentTimeMillis() - start) + "ms");
+
+    System.out.println(collection(TestUser.class).find(op -> {
+      op.filter = "testCats[0].testRace.type==Main Coon";
+      op.limit = 3;
+      op.offset = 0;
+      op.sort = "age=asc";
+    }));
+
+    System.out.println(collection(TestUser.class).find(op -> {
+      op.sort = "age<";
+      op.limit = 2;
+    }));
   
 //    System.out.println(collection(TestUser.class).find("testCats[0].testRace.type==Main Coon", 10));
   }
@@ -116,7 +125,7 @@ public class CollectionTest {
   public void testFind() {
     testSaveList();
     assertEquals(collection(TestUser.class).find().size(), 100);
-    
+
 //  eq
     assertEquals(collection(TestUser.class).find("username=User-1").size(), 1);
     assertEquals(collection(TestUser.class).find("testCats[0].name = Cat-1").size(), 1);
