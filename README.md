@@ -13,13 +13,14 @@ It's a lightweight embedded document database, ideal for small web applications.
 ```java
 import static nosqlite.Database.collection;
 
-MyCustomUser john = new MyCustomUser("John");
+// MyUser is an example class
+MyUser john = new MyUser("John");
 
-// save john to the MyCustomUser-collection
-collection("MyCustomUser").save(john);      // select collection with class name
-collection(MyCustomUser.class).save(john);  // select collection with class
+// save john to the MyUser-collection
+collection("MyUser").save(john);      // select collection with class name
+collection(MyUser.class).save(john);  // select collection with class
 
-List<MyCustomUser> users = collection("MyCustomUser").find();  // get all users
+List<MyUser> users = collection("MyUser").find();  // get all users
 ```
 
 ## Table of content
@@ -48,23 +49,23 @@ List<MyCustomUser> users = collection("MyCustomUser").find();  // get all users
 [nosqlite-1.0.4.jar](https://github.com/Aarkan1/nosqlite/releases/download/1.0.4/nosqlite-1.0.4.jar)
 
 ### Maven
-> Add repository:
+> Add this to your pom.xml
 
 ```xml
-<repository>
+<repositories>
+  <repository>
     <id>jitpack.io</id>
     <url>https://jitpack.io</url>
-</repository>
-```
+  </repository>
+</repositories>
 
-> Add dependency:
-
-```xml
-<dependency>
+<dependencies>
+  <dependency>
     <groupId>com.github.Aarkan1</groupId>
     <artifactId>nosqlite</artifactId>
     <version>1.0.4</version>
-</dependency>
+  </dependency>
+</dependencies>
 ```
 
 ### Gradle
@@ -89,28 +90,28 @@ This will create a database-file in your project. Easy to deploy or share.
 ```java
 import static nosqlite.Database.collection;
 
-MyCustomUser john = new MyCustomUser("John");
+MyUser john = new MyUser("John");
 
 // generates an UUID like: "lic4XCz2kxSOn4vr0D8BV"
-collection("MyCustomUser").save(john);     // select collection with class name
-collection(MyCustomUser.class).save(john); // select collection with class
+collection("MyUser").save(john);     // select collection with class name
+collection(MyUser.class).save(john); // select collection with class
 
-MyCustomUser jane = collection("MyCustomUser").findById("lic4XCz2kxSOn4vr0D8BV");
+MyUser jane = collection("MyUser").findById("lic4XCz2kxSOn4vr0D8BV");
 
 jane.setAge(30);
 
 // updates document with same UUID
-collection("MyCustomUser").save(jane); 
+collection("MyUser").save(jane); 
 
 // delete Jane
-collection("MyCustomUser").deleteById("lic4XCz2kxSOn4vr0D8BV"); 
+collection("MyUser").deleteById("lic4XCz2kxSOn4vr0D8BV"); 
 
-List<MyCustomUser> users = collection("MyCustomUser").find(); // get all users
+List<MyUser> users = collection("MyUser").find(); // get all users
 
-List<MyCustomUser> usersNamedJohn = collection("MyCustomUser").find(eq("name", "John"));
+List<MyUser> usersNamedJohn = collection("MyUser").find(eq("name", "John"));
 
 // or with the statement syntax
-List<MyCustomUser> usersNamedJohn = collection("MyCustomUser").find("name==John"); 
+List<MyUser> usersNamedJohn = collection("MyUser").find("name==John"); 
 ```
 
 ## Document
@@ -147,8 +148,8 @@ Watch a collection on changes:
 // model - is the document class that was triggered 
 // event - is the event triggered - 'insert', 'update' or 'delete'
 // data - is a list with effected documents
-collection("MyCustomUser").watch(watchData -> {
-    List<MyCustomUser> effectedUsers = (List<MyCustomUser>) watchData.data;
+collection("MyUser").watch(watchData -> {
+    List<MyUser> effectedUsers = (List<MyUser>) watchData.data;
 
     switch(watchData.event) {
         case "insert": // on created document
@@ -165,18 +166,18 @@ collection("MyCustomUser").watch(watchData -> {
 
 Watch a collection on changes on a specific event:
 ```java
-collection("MyCustomUser").watch("insert", watchData -> {
-    List<MyCustomUser> effectedUsers = (List<MyCustomUser>) watchData.data;
+collection("MyUser").watch("insert", watchData -> {
+    List<MyUser> effectedUsers = (List<MyUser>) watchData.data;
     // do logic with inserted documents
 });
 
-collection("MyCustomUser").watch("update", watchData -> {
-    List<MyCustomUser> effectedUsers = (List<MyCustomUser>) watchData.data;
+collection("MyUser").watch("update", watchData -> {
+    List<MyUser> effectedUsers = (List<MyUser>) watchData.data;
     // do logic with updated documents
 });
 
-collection("MyCustomUser").watch("delete", watchData -> {
-    List<MyCustomUser> effectedUsers = (List<MyCustomUser>) watchData.data;
+collection("MyUser").watch("delete", watchData -> {
+    List<MyUser> effectedUsers = (List<MyUser>) watchData.data;
     // do logic with deleted documents
 });
 ```
