@@ -164,8 +164,7 @@ class DbHelper {
       }
     }
     
-    // fetch doc before delete
-    if (query.startsWith("DELETE")) {
+    if (query.startsWith("DROP") || query.startsWith("DELETE")) {
       stmt.executeUpdate();
       return "deleted";
     }
@@ -297,11 +296,6 @@ class DbHelper {
   }
   
   String findAsJson(String collName, String filter, String sort, int limit, int offset) {
-    if (filter == null) {
-      return get(String.format("SELECT GROUP_CONCAT(value) FROM (SELECT value FROM %1$s" +
-          (limit == 0 ? ")" : " LIMIT %2$d OFFSET %3$d)"), collName, limit, offset));
-    }
-    
     String orderBy = "";
     String[] order = new String[2];
     if (sort != null) {
@@ -317,11 +311,21 @@ class DbHelper {
       }
       orderBy = " ORDER BY json_extract(value, ?) " + order[1];
     }
+
+    if (filter == null) {
+      String q = String.format("SELECT GROUP_CONCAT(value) FROM (SELECT value FROM %1$s" +
+              orderBy + (limit == 0 ? ")" : " LIMIT %2$d OFFSET %3$d)"), collName, limit, offset);
+      if(sort != null) {
+        Object[] params = { order[0] };
+        return get(q, params);
+      }
+      return get(q);
+    }
     
     Map<String, List<String>> filters = generateWhereClause(filter);
     String q = String.format("SELECT GROUP_CONCAT(value) FROM (SELECT value FROM %1$s"
         + filters.get("query").get(0) + orderBy + (limit == 0 ? ")" : " LIMIT %2$d OFFSET %3$d)"), collName, limit, offset);
-  
+    
 //    System.out.println(q); // debug
     
     List params = populateParams(filters);

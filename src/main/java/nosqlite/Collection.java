@@ -240,7 +240,7 @@ public class Collection {
   
   public <T> List<T> find(String filter, String sort, int limit, int offset) {
     String jsonArray = findAsJson(filter, sort, limit, offset);
-    if (jsonArray == null) return new ArrayList<>();
+    if (jsonArray == null || jsonArray.equals("[]")) return new ArrayList<>();
     try {
       return mapper.readValue(jsonArray, mapper.getTypeFactory().constructCollectionType(List.class, klass));
     } catch (JsonProcessingException e) {
@@ -283,7 +283,9 @@ public class Collection {
   }
   
   public String findAsJson(String filter, String sort, int limit, int offset) {
-    return "[" + db.findAsJson(collName, filter, sort, limit, offset) + "]";
+    String json = db.findAsJson(collName, filter, sort, limit, offset);
+    if(json == null) return "[]";
+    return "[" + json + "]";
   }
   
   public String findOneAsJson(String filter) {

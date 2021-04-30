@@ -45,7 +45,7 @@ List<MyCustomUser> users = collection("MyCustomUser").find();  // get all users
 ### Download
 > Direct download as jar:
 
-[nosqlite-1.0.0.jar](https://github.com/Aarkan1/nosqlite/releases/download/1.0.0/nosqlite-1.0.0.jar)
+[nosqlite-1.0.3.jar](https://github.com/Aarkan1/nosqlite/releases/download/1.0.3/nosqlite-1.0.3.jar)
 
 ### Maven
 > Add repository:
@@ -63,7 +63,7 @@ List<MyCustomUser> users = collection("MyCustomUser").find();  // get all users
 <dependency>
     <groupId>com.github.Aarkan1</groupId>
     <artifactId>nosqlite</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.3</version>
 </dependency>
 ```
 
@@ -76,7 +76,7 @@ repositories {
 }
 
 dependencies {
-    compile 'com.github.Aarkan1:nosqlite:1.0.0'
+    compile 'com.github.Aarkan1:nosqlite:1.0.3'
 }
 ```
 
@@ -250,30 +250,30 @@ import static nosqlite.utilities.Filter.*;
 
 **Table 2. Comparison Filter**
 
-| Filter | Method | Description |
-| --- | --- | --- |
-| Equals | eq(String, Object) | Matches values that are equal to a specified value. |
-| NotEquals | ne(String, Object) | Matches values that are not equal to a specified value. |
-| Greater | gt(String, Object) | Matches values that are greater than a specified value. |
-| GreaterEquals | gte(String, Object) | Matches values that are greater than or equal to a specified value. |
-| Lesser | lt(String, Object) | Matches values that are less than a specified value. |
-| LesserEquals | lte(String, Object) | Matches values that are less than or equal to a specified value. |
-| In | in(String, Object[]) | Matches any of the values specified in an array. |
+| Filter | Operator | Method | Description |
+| --- | --- | --- | --- |
+| Equals | == | eq(String, Object) | Matches values that are equal to a specified value. |
+| NotEquals | != | ne(String, Object) | Matches values that are not equal to a specified value. |
+| Greater | > | gt(String, Object) | Matches values that are greater than a specified value. |
+| GreaterEquals | >= | gte(String, Object) | Matches values that are greater than or equal to a specified value. |
+| Lesser | < | lt(String, Object) | Matches values that are less than a specified value. |
+| LesserEquals | <= | lte(String, Object) | Matches values that are less than or equal to a specified value. |
+| In | ==[1, 2] | in(String, Object[]) | Matches any of the values specified in an array. |
 
 **Table 3. Logical Filters**
 
-| Filter | Method | Description |
-| --- | --- | --- |
-| Not | not(Filter) | Inverts the effect of a filter and returns results that do not match the filter. |
-| Or | or(Filter...) | Joins filters with a logical OR returns all ids of the documents that match the conditions of either filter. |
-| And | and(Filter...) | Joins filters with a logical AND returns all ids of the documents that match the conditions of both filters. |
+| Filter | Operator | Method | Description |
+| --- | --- | --- | --- |
+| Not | "!statement" | not(Filter) | Inverts the effect of a filter and returns results that do not match the filter. |
+| Or | "statement1 || statement2" | or(Filter...) | Joins filters with a logical OR returns all ids of the documents that match the conditions of either filter. |
+| And | "statement1 && statement2" | and(Filter...) | Joins filters with a logical AND returns all ids of the documents that match the conditions of both filters. |
 
 **Table 4. Text Filters**
 
-| Filter | Method | Description |
-| --- | --- | --- |
-| Text | text(String, String) | Performs full-text search. Same syntax as [SQL LIKE](https://www.w3schools.com/sql/sql_like.asp) |
-| Regex | regex(String, String) | Selects documents where values match a specified regular expression. |
+| Filter | Operator | Method | Description |
+| --- | --- | --- | --- |
+| Text | =~ | text(String, String) | Performs full-text search. Same syntax as [SQL LIKE](https://www.w3schools.com/sql/sql_like.asp) |
+| Regex | ~~ | regex(String, String) | Selects documents where values match a specified regular expression. |
 
 ### FindOptions
 

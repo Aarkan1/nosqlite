@@ -57,11 +57,23 @@ public class Database {
       }
     }
   }
-  
+
+  /**
+   *
+   * @return name of collections that contains saved documents
+   */
   public static List<String> collectionNames() {
     String tablesQuery = dbHelper.get("SELECT GROUP_CONCAT(name) FROM sqlite_master WHERE type='table'");
     String[] tables = tablesQuery.split(",");
-    return Arrays.asList(tables);
+    List<String> asList = new ArrayList<>();
+
+    for(String table : tables) {
+      int count = Integer.parseInt(dbHelper.get(String.format("SELECT COUNT(*) FROM %s", table)));
+      if(count > 0) {
+        asList.add(table);
+      }
+    }
+    return asList;
   }
 
   public static Collection collection(Class klass) { return collection(klass.getSimpleName()); }
