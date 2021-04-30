@@ -45,7 +45,7 @@ List<MyCustomUser> users = collection("MyCustomUser").find();  // get all users
 ### Download
 > Direct download as jar:
 
-[nosqlite-1.0.3.jar](https://github.com/Aarkan1/nosqlite/releases/download/1.0.3/nosqlite-1.0.3.jar)
+[nosqlite-1.0.4.jar](https://github.com/Aarkan1/nosqlite/releases/download/1.0.4/nosqlite-1.0.4.jar)
 
 ### Maven
 > Add repository:
@@ -63,7 +63,7 @@ List<MyCustomUser> users = collection("MyCustomUser").find();  // get all users
 <dependency>
     <groupId>com.github.Aarkan1</groupId>
     <artifactId>nosqlite</artifactId>
-    <version>1.0.3</version>
+    <version>1.0.4</version>
 </dependency>
 ```
 
@@ -76,7 +76,7 @@ repositories {
 }
 
 dependencies {
-    compile 'com.github.Aarkan1:nosqlite:1.0.3'
+    compile 'com.github.Aarkan1:nosqlite:1.0.4'
 }
 ```
 

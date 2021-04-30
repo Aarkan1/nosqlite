@@ -252,12 +252,12 @@ public class Collection {
   public <T> List<T> find(FindOptionsHandler option) {
     FindOptions op = new FindOptions();
     option.handle(op);
-    return (List<T>) find(op.filter, op.sort, op.limit, op.offset);
+    return find(op.filter, op.sort, op.limit, op.offset);
   }
   
   public <T> T findOne(String filter) {
     List docs = find(filter, 1);
-    return docs != null ? (T) docs.get(0) : null;
+    return docs.size() > 0 ? (T) docs.get(0) : null;
   }
   
   public String findAsJson(FindOptionsHandler option) {
