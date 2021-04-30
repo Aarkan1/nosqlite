@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import nosqlite.annotations.Id;
+import nosqlite.annotations.Transient;
 import nosqlite.exceptions.IdAnnotationMissingException;
 import nosqlite.exceptions.TypeMismatchException;
 import nosqlite.handlers.*;
@@ -24,6 +25,7 @@ public class Collection {
   private DbHelper db;
   private ObjectMapper mapper = new ObjectMapper();
   private String idField;
+  private boolean hasTransient = false;
   
   Collection(DbHelper db, Class klass, String collName) {
     this.klass = klass;
@@ -34,9 +36,11 @@ public class Collection {
       idField = "_id";
     } else {
       for (Field field : klass.getDeclaredFields()) {
+        if (field.isAnnotationPresent(Transient.class)) {
+          hasTransient = true;
+        }
         if (field.isAnnotationPresent(Id.class)) {
           idField = field.getName();
-          break;
         }
       }
       if (idField == null) try {
@@ -145,6 +149,9 @@ public class Collection {
       return null;
     }
     
+    // temporarily remove @Transient property
+    List<Object[]> transientFields = getTransientFields(document);
+    
     Map<String, String> field = getIdField(document);
     String json = JSONstringify(document);
     String exists = get(field.get("id"));
@@ -154,6 +161,9 @@ public class Collection {
         "ON CONFLICT(key) DO UPDATE SET value=json(excluded.value)", collName);
     Object[] params = {field.get("id"), json};
     db.run(exists != null ? "update" : "insert", query, params, klass, collName);
+    
+    // re-populate transient fields
+    setTransientFields(document, transientFields);
     return (T) document;
   }
   
@@ -168,6 +178,7 @@ public class Collection {
   public <T> T[] saveMany(Object[] documents) {
     if (documents == null) throw new NullPointerException();
   
+    Map<Object, List<Object[]>> documentsTransientFields = new HashMap<>();
     boolean isJson = false;
     
     if (documents instanceof String[] || documents[0] instanceof String) {
@@ -185,12 +196,23 @@ public class Collection {
           e.printStackTrace();
           return null;
         }
+  
+        // temporarily remove @Transient property
+        if(hasTransient) {
+          documentsTransientFields.put(doc, getTransientFields(doc));
+        }
       }
     }
     
     String q = "INSERT INTO " + collName + " VALUES(?, json(?)) " +
         "ON CONFLICT(key) DO UPDATE SET value=json(excluded.value)";
     db.run("queryMany", q, documents, klass, collName);
+  
+    if(!isJson && hasTransient) {
+      for (Object doc : documents) {
+        setTransientFields(doc, documentsTransientFields.get(doc));
+      }
+    }
     return (T[]) documents;
   }
   
@@ -426,6 +448,42 @@ public class Collection {
     } catch (JsonProcessingException e) {
       e.printStackTrace();
       return null;
+    }
+  }
+  
+  private List<Object[]> getTransientFields(Object document) {
+    if(!hasTransient) return null;
+    
+    List<Object[]> transientFields = new ArrayList<>();
+    
+    try {
+      for (Field field : document.getClass().getDeclaredFields()) {
+        if (field.isAnnotationPresent(Transient.class)) {
+          field.setAccessible(true);
+          Object[] transientField = { field.getName(), field.get(document) };
+          transientFields.add(transientField);
+          field.set(document, null); // remove value from field
+        }
+      }
+    } catch (IllegalAccessException e) {
+      e.printStackTrace();
+      return null;
+    }
+    
+    return transientFields;
+  }
+  
+  private void setTransientFields(Object document, List<Object[]> transientFields) {
+    if(!hasTransient) return;
+    
+    try {
+      for(Object[] fieldMap : transientFields) {
+        Field field = document.getClass().getDeclaredField((String) fieldMap[0]);
+        field.setAccessible(true);
+        field.set(document, fieldMap[1]); // add value to field
+      }
+    } catch (IllegalAccessException | NoSuchFieldException e) {
+      e.printStackTrace();
     }
   }
   

@@ -60,6 +60,20 @@ public class CollectionTest {
     
     String json = "{\"uid\":\"OMqGBZy-AIHXKcyZSGMQe\",\"username\":\"Loke\",\"password\":\"abc123\",\"age\":0,\"testCats\":[]}";
     assertEquals(json, collection(TestUser.class).findByIdAsJson(testUser.getUid()));
+    
+    TestCat testCat = new TestCat("Tyson", "Gray");
+    TestCat testCat2 = new TestCat("Cocos", "Orange");
+    TestCat testCat3 = new TestCat("Snuggles", "White");
+    
+    List<TestCat> testCats = new ArrayList<>();
+    testCats.add(testCat);
+    testCats.add(testCat2);
+    testCats.add(testCat3);
+    collection(TestCat.class).save(testCats);
+  
+//    System.out.println(collection(TestCat.class).find());
+  
+//    System.out.println(testCats);
   }
   
   @Test
