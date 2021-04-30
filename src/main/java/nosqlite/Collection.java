@@ -191,6 +191,8 @@ public class Collection {
         if (doc == null) throw new NullPointerException();
         
         if (doc.getClass() != klass) try {
+          System.out.println(doc.getClass());
+          System.out.println(klass);
           throw new TypeMismatchException(String.format("'%s' cannot be saved in a '%s' collection", documents[0].getClass().getSimpleName(), collName));
         } catch (TypeMismatchException e) {
           e.printStackTrace();

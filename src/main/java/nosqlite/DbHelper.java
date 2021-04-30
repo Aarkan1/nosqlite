@@ -321,6 +321,8 @@ class DbHelper {
     Map<String, List<String>> filters = generateWhereClause(filter);
     String q = String.format("SELECT GROUP_CONCAT(value) FROM (SELECT value FROM %1$s"
         + filters.get("query").get(0) + orderBy + (limit == 0 ? ")" : " LIMIT %2$d OFFSET %3$d)"), collName, limit, offset);
+  
+//    System.out.println(q); // debug
     
     List params = populateParams(filters);
     if (sort != null) params.add(order[0]);
@@ -486,11 +488,12 @@ class DbHelper {
     List<String> paths = new ArrayList<>();
     List<String> values = new ArrayList<>();
     
-    String regex = useRegex ? "(\\s*\\!\\s*)?([\\(\\w\\s\\.\\[\\]]+)\\s*(~~|=~|==|>=|<=|!=|<|>|=)\\s*(([%\\-,\\^_\\w\\.\\[\\]\\(\\)\\?\\>\\<\\:\\=\\{\\}\\+\\*\\$\\\\\\/]*\\|{0,1}[%\\-,\\^_\\w\\s\\.\\[\\]\\(\\)\\?\\>\\<\\:\\=\\{\\}\\+\\*\\$\\\\\\/])*(?<!\\|))\\)?(&&|\\|\\|)?"
-        : "(\\s*\\!\\s*)?([\\(\\w\\s\\.\\[\\]]+)\\s*(=~|==|>=|<=|!=|<|>|=)\\s*([%\\-,\\_\\w\\s\\.\\[\\]!?]*)\\)?(&&|\\|\\|)?";
+    String regex =  "(\\s*\\!\\s*)?([\\(\\w\\s\\.\\[\\]]+)\\s*(~~|=~|==|>=|<=|!=|<|>|=)\\s*(([!-%'-{\\}£~\\såäöÅÄÖ]*\\|{0,1}\\&{0,1}[!-%'-{\\}£~\\såäöÅÄÖ])*(?<!\\|))(&&|\\|\\|)?";
     
     String query = " WHERE" + new Rewriter(regex) {
       public String replacement() {
+        
+        boolean isRegex = group(3).equals("~~");
         
         String path = group(2).replace(" ", "");
         String startParam =  "";
@@ -506,6 +509,7 @@ class DbHelper {
         String val = group(4).trim();
         String comparator;
         
+        
         if ((group(3).equals("==") || group(3).equals("="))
             && (val.startsWith("[") && val.endsWith("]"))) {
           
@@ -520,13 +524,13 @@ class DbHelper {
           comparator = comparator.replaceAll(",$", ")");
         } else if (group(3).equals("=~")) {
           comparator = "LIKE ?";
-        } else if (useRegex && group(3).equals("~~")) {
+        } else if (isRegex) {
           comparator = "REGEXP ?";
         } else {
           comparator = group(3) + " ?";
         }
         
-        if (val.endsWith(")")) {
+        if (!isRegex && val.endsWith(")")) {
           comparator += ")";
           val = val.replaceAll("\\s*\\)$", "");
         }

@@ -50,9 +50,9 @@ public class Database {
 
     Set<Class<?>> klasses = new Reflections().getTypesAnnotatedWith(Document.class);
     for(Class<?> k : klasses) {
-      if(runTestSuite || !k.getPackage().getName().equals("test_entities")) {
+      if(runTestSuite || !k.getPackage().getName().contains("test_entities")) {
         String name = k.getAnnotation(Document.class).collection();
-        name = name.equals("_default_coll") ? k.getSimpleName() : name;
+        name = name.equals("default_coll") ? k.getSimpleName() : name;
         collections.putIfAbsent(name, new Collection(dbHelper, k, name));
       }
     }
@@ -66,7 +66,7 @@ public class Database {
 
   public static Collection collection(Class klass) { return collection(klass.getSimpleName()); }
   
-  public static Collection collection() { return collection("_default_coll"); }
+  public static Collection collection() { return collection("default_coll"); }
 
   public static Collection collection(String doc) {
     if(singleton == null) singleton = new Database();

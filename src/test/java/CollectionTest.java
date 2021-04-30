@@ -76,6 +76,16 @@ public class CollectionTest {
 //    System.out.println(collection(TestCat.class).find());
   
 //    System.out.println(testCats);
+    
+    TestUser testUser1 = new TestUser("loke@loke.se", "(abc'\"(){}£%/\\123åÄö$.-_!#@");
+    testUser1.setUid("test123");
+    
+    collection(TestUser.class).save(testUser1);
+  
+    String testUser1JSON = "{\"uid\":\"test123\",\"username\":\"loke@loke.se\",\"password\":\"(abc'\\\"(){}£%/\\\\123åÄö$.-_!#@\",\"age\":0,\"testCats\":[]}";
+  
+    assertEquals(collection(TestUser.class).findOneAsJson("username==loke@loke.se"), testUser1JSON);
+    assertEquals(collection(TestUser.class).findOneAsJson("password==(abc'\"(){}£%/\\123åÄö$.-_!#@"), testUser1JSON);
   }
   
   @Test
@@ -171,6 +181,7 @@ public class CollectionTest {
 //  regex
     assertEquals(collection(TestUser.class).find("username~~[0-3]$").size(), 40);
     assertEquals(collection(TestUser.class).find(regex("username","[0-3]$")).size(), 40);
+    assertEquals(collection(TestUser.class).find("username~~([0-3])").size(), 58);
 
 //  not
     assertEquals(collection(TestUser.class).find("!(testCats[0].testRace.type=Main Coon&&testCats[0].testRace.time>=80)").size(), 80);
