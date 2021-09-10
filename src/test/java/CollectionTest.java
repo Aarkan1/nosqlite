@@ -28,8 +28,8 @@ public class CollectionTest {
     // init collections to memory
     collection(config -> {
 //      config.runAsync = false;
-//      config.dbPath = "db/test.db";
-      config.dbPath = ":memory:";
+      config.dbPath = "db/test.db";
+//      config.dbPath = ":memory:";
       config.runTestSuite = true;
     });
   }
@@ -428,8 +428,9 @@ public class CollectionTest {
   @Disabled
   @Test
   public void stressTest() {
-    int iter = 100;
-    populateUsers(iter);
+    boolean useThreads = true;
+    int iter = 10;
+    populateUsers(iter, useThreads);
     
     start();
     int sortedCount = collection(TestUser.class).find(null, "testCats[0].testRace.type=asc", 0, 0).size();
@@ -457,7 +458,7 @@ public class CollectionTest {
     stop("size of " + collection(TestUser.class).count() + " docs");
   }
   
-  private void populateUsers(int iter) {
+  private void populateUsers(int iter, boolean useThreads) {
     TestUser[] importedTestUsers = null;
     try {
       ObjectMapper mapper = new ObjectMapper();
@@ -470,12 +471,21 @@ public class CollectionTest {
     long sum = 0;
     
     for(int i = 0; i < iter; i++) {
-      for(TestUser u : importedTestUsers) {
-        u.setUid(null);
+      if (useThreads) {
+        for(TestUser u : importedTestUsers) {
+          new Thread(() -> {
+            u.setUid(null);
+            collection(TestUser.class).save(u);
+          });
+        }
+      } else {
+        for(TestUser u : importedTestUsers) {
+          u.setUid(null);
+        }
+        start();
+        collection(TestUser.class).save(importedTestUsers);
+        sum += (System.currentTimeMillis() - time);
       }
-      start();
-      collection(TestUser.class).save(importedTestUsers);
-      sum += (System.currentTimeMillis() - time);
     }
     
     System.out.println("saved " + iter + "000 docs as " + iter + " arrays: " + sum + "ms");

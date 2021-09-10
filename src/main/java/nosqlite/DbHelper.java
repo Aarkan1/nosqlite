@@ -62,37 +62,36 @@ class DbHelper {
     this.runAsync = runAsync;
     this.useRegex = useRegex;
     if (useRegex) addRegex(conn);
-    
-    if (runAsync) {
-      new Thread(() -> {
-        while (isRunning.get() || !tasks.isEmpty()) {
-          try {
-            Task task = tasks.take();
-            
-            if (task.method.equals("queryMany")) {
-              String[] future = {"insert", queryMany(task.query, task.params, task.coll, task.collName)};
-              task.future.complete(future);
-            } else {
-              String[] future = {task.method, query(task.query, task.params, task.collName)};
-              task.future.complete(future);
-            }
-          } catch (InterruptedException | SQLException e) {
-            e.printStackTrace();
-          }
-        }
-        
-        // stop watch handlers
-        watchExecutor.shutdown();
-        
-        try {
-          conn.close();
-        } catch (SQLException e) {
-          e.printStackTrace();
-        }
-      }).start();
-    }
-    
     Runtime.getRuntime().addShutdownHook(new Thread(this::close));
+
+//    if (runAsync) {
+//      new Thread(() -> {
+//        while (isRunning.get() || !tasks.isEmpty()) {
+//          try {
+//            Task task = tasks.take();
+//
+//            if (task.method.equals("queryMany")) {
+//              String[] future = {"insert", queryMany(task.query, task.params, task.coll, task.collName)};
+//              task.future.complete(future);
+//            } else {
+//              String[] future = {task.method, query(task.query, task.params, task.collName)};
+//              task.future.complete(future);
+//            }
+//          } catch (InterruptedException | SQLException e) {
+//            e.printStackTrace();
+//          }
+//        }
+//
+//        // stop watch handlers
+//        watchExecutor.shutdown();
+//
+//        try {
+//          conn.close();
+//        } catch (SQLException e) {
+//          e.printStackTrace();
+//        }
+//      }).start();
+//    }
   }
   
   void close() {
@@ -112,15 +111,15 @@ class DbHelper {
     // get[0] == event
     // get[1] == document
     
-    if (runAsync) {
-      CompletableFuture<String[]> future = new CompletableFuture<>();
-      tasks.add(new Task(method, query, params, coll, collName, future));
-      try {
-        get = future.get();
-      } catch (InterruptedException | ExecutionException e) {
-        e.printStackTrace();
-      }
-    } else {
+//    if (runAsync) {
+//      CompletableFuture<String[]> future = new CompletableFuture<>();
+//      tasks.add(new Task(method, query, params, coll, collName, future));
+//      try {
+//        get = future.get();
+//      } catch (InterruptedException | ExecutionException e) {
+//        e.printStackTrace();
+//      }
+//    } else {
       try {
         if (method.equals("queryMany")) {
           get[0] = "insert";
@@ -132,7 +131,7 @@ class DbHelper {
       } catch (SQLException e) {
         e.printStackTrace();
       }
-    }
+//    }
     
     if (!query.startsWith("CREATE")) {
       // don't bother converting json if there's no watchers

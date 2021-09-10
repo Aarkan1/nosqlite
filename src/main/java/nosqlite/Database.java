@@ -4,6 +4,8 @@ import nosqlite.annotations.Document;
 import nosqlite.handlers.CollectionConfig;
 import nosqlite.handlers.CollectionConfigHandler;
 import org.reflections8.Reflections;
+import org.sqlite.SQLiteConfig;
+import org.sqlite.SQLiteOpenMode;
 
 import java.io.File;
 import java.sql.Connection;
@@ -21,7 +23,7 @@ public class Database {
   private static DbHelper dbHelper = null;
   private static Database singleton = null;
   
-  public static boolean runAsync = true;
+  public static boolean runAsync = false;
   public static boolean useBrowser = false;
   public static boolean useWatchers = false;
   public static boolean runTestSuite = false;
@@ -41,7 +43,10 @@ public class Database {
     }
 
     try {
-      conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
+      // mode: Serialize, works with multiple threads
+      SQLiteConfig config = new SQLiteConfig();
+      config.setOpenMode(SQLiteOpenMode.FULLMUTEX);
+      conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath, config.toProperties());
       dbHelper = new DbHelper(conn, true, runAsync);
     } catch (SQLException e) {
       e.printStackTrace();
