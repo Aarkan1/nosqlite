@@ -5,8 +5,8 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.aarkan</groupId>
-  <artifactId>nosqlite</artifactId>
-  <version>1.0.4</version>
+  <artifactId>colldb</artifactId>
+  <version>1.1.0</version>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -14,6 +14,7 @@
     <maven.compiler.target>1.8</maven.compiler.target>
     <java.version>1.8</java.version>
     <jackson.version>2.11.3</jackson.version>
+    <jetty.version>10.0.6</jetty.version>
   </properties>
 
   <dependencies>
@@ -21,6 +22,28 @@
       <groupId>org.xerial</groupId>
       <artifactId>sqlite-jdbc</artifactId>
       <version>3.34.0</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.httprpc</groupId>
+      <artifactId>httprpc-server</artifactId>
+      <version>8.3.4</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-server</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-webapp</artifactId>
+      <version>${jetty.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty.websocket</groupId>
+      <artifactId>websocket-jetty-server</artifactId>
+      <version>${jetty.version}</version>
     </dependency>
 
     <dependency>
@@ -74,6 +97,17 @@
         <version>3.0.0-M5</version>
         <configuration>
           <skipTests>true</skipTests>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.8.1</version>
+        <configuration>
+          <compilerArgs>
+            <!-- add servlet url params flag -->
+            <arg>-parameters</arg>
+          </compilerArgs>
         </configuration>
       </plugin>
     </plugins>

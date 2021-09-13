@@ -1,6 +1,8 @@
 package nosqlite;
 
 import nosqlite.annotations.Document;
+import nosqlite.annotations.Id;
+import nosqlite.browser.Browser;
 import nosqlite.handlers.CollectionConfig;
 import nosqlite.handlers.CollectionConfigHandler;
 import org.reflections8.Reflections;
@@ -8,6 +10,7 @@ import org.sqlite.SQLiteConfig;
 import org.sqlite.SQLiteOpenMode;
 
 import java.io.File;
+import java.lang.reflect.Field;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -52,6 +55,9 @@ public class Database {
       e.printStackTrace();
       return;
     }
+  
+    Map<String, Class<?>> collNames = new HashMap<>();
+    Map<String, String> idFields = new HashMap<>();
 
     Set<Class<?>> klasses = new Reflections().getTypesAnnotatedWith(Document.class);
     for(Class<?> k : klasses) {
@@ -59,7 +65,20 @@ public class Database {
         String name = k.getAnnotation(Document.class).collection();
         name = name.equals("default_coll") ? k.getSimpleName() : name;
         collections.putIfAbsent(name, new Collection(dbHelper, k, name));
+        collNames.putIfAbsent(name, k);
+  
+        for(Field field : k.getDeclaredFields()) {
+          if(field.isAnnotationPresent(Id.class)) {
+            idFields.putIfAbsent(name, field.getName());
+            break;
+          }
+        }
       }
+    }
+    
+//    if (useWatchers) watchCollections(collNames);
+    if (useBrowser) {
+      new Browser(collNames, idFields);
     }
   }
 

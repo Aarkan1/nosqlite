@@ -14,6 +14,7 @@ public class TestUser {
   private String username;
   private String password;
   private int age;
+  private TestCat testCat;
 
   private List<TestCat> testCats = new ArrayList<>();
 
@@ -34,6 +35,14 @@ public class TestUser {
     this.username = username;
     this.password = password;
     this.age = age;
+  }
+  
+  public TestCat getTestCat() {
+    return testCat;
+  }
+  
+  public void setTestCat(TestCat testCat) {
+    this.testCat = testCat;
   }
   
   public int getAge() {
